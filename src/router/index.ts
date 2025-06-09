@@ -1,12 +1,26 @@
-import { createWebHistory, createRouter } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router';
 import { useUserStore } from '../stores/index';
 
 import Login from '@/passport/Login.vue'
 import CallBack from '@/passport/CallBack.vue'
 import Home from '@/view/Home.vue'
+import Overview from '@/view/Overview.vue'
+import Issues from '@/view/Issues.vue'
+import Repositories from '@/view/Repositories.vue'
+import Projects from '@/view/Projects.vue'
 
 const routes = [
-  { path: '/', component: Home },
+  {
+    path: '/',
+    component: Home,
+    redirect: '/overview',
+    children: [
+      { path: '/overview', component: Overview, name: 'Overview' },
+      { path: '/issues', component: Issues, name: 'Issues' },
+      { path: '/repositories', component: Repositories, name: 'Repositories' },
+      { path: '/projects', component: Projects, name: 'Projects' },
+    ]
+  },
   { path: '/login', component: Login },
   { path: '/callback', component: CallBack },
 ]
@@ -16,10 +30,9 @@ const router = createRouter({
   routes,
 })
 
-
 router.beforeEach(async (to) => {
   const userStore = useUserStore();
-  if (userStore.user.userid) {
+  if (userStore.user.id) {
     return true
   } else {
     if (to.path === '/login' || to.path === '/callback' || to.path === '/404') {

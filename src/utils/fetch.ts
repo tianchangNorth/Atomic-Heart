@@ -1,7 +1,7 @@
 // src/utils/http.ts
 import { invoke } from '@tauri-apps/api/core';
 import { getToken } from './token';
-import router from '@/router';
+// import router from '@/router';
 export interface ApiResponse {
   success: boolean;
   code: number;
@@ -40,7 +40,7 @@ export async function $fetch(url: string, options: HttpOptions): Promise<ApiResp
   if (response.success) {
     return response;
   } else {
-    router.push('/login');
+    // router.push('/login');
     throw new Error(response.message);
   }
 }

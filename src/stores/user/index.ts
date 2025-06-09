@@ -2,17 +2,30 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { $fetch } from '@/utils/fetch';
 interface UserState {
-  userid?: string;
+  id?: string;
   name?: string;
-  position?: string;
-  department?: number[];
+  avatar_url?: string;
+  bio?: string;
+  email?: string;
+  followers?: number;
+  following?: number;
+  html_url?: string;
+  location?: string;
+  total_repos?: number;
 }
 
 const useUserStore = defineStore('user', () => {
   const getInitUser = (): UserState => ({
-    userid: undefined,
+    id: undefined,
     name: undefined,
-    position: undefined,
+    avatar_url: undefined,
+    bio: undefined,
+    email: undefined,
+    followers: undefined,
+    following: undefined,
+    html_url: undefined,
+    location: undefined,
+    total_repos: undefined,
   });
 
   const user = ref<UserState>(getInitUser());
