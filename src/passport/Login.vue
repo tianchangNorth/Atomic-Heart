@@ -6,6 +6,10 @@ import { Loader2 } from 'lucide-vue-next'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { $fetch } from '@/utils/fetch'
+import { saveToken } from '@/utils/token'
+import { useUserStore } from '@/stores'
+
+import router from '@/router'
 
 const isLoading = ref(false)
 const authCode = ref('')
@@ -14,8 +18,8 @@ const unlisten = ref<UnlistenFn | null>(null)
 
 // OAuth配置
 const oauthConfig = {
-  clientId: 'f03d14b758d34f50', // 您的客户端ID
-  clientSecret: 'c72a7d1d8b07468f8f5edbb1', // 您的客户端密钥
+  clientId: import.meta.env.VITE_APP_CLIENT_ID, // 您的客户端ID
+  clientSecret: import.meta.env.VITE_APP_CLIENT_SECRET, // 您的客户端密钥
   redirectUri: 'http://localhost:1420/callback', // 使用 OAuth 插件的本地服务器地址
   state: 'state_test' // 用于防止CSRF攻击的状态参数
 }
@@ -75,7 +79,7 @@ const exchangeCodeForToken = async (code: string) => {
 
   try {
     // 这里应该调用您的后端API或直接调用OAuth提供商的令牌端点
-    const result = await $fetch('/login/oauth/access_token',
+    const { success, data } = await $fetch('/login/oauth/access_token',
       {
         method: 'POST',
         body: {
@@ -85,7 +89,15 @@ const exchangeCodeForToken = async (code: string) => {
         }
       })
     // 模拟API调用
-    console.log('获取到访问令牌:', result);
+    if (success) {
+      console.log('获取访问令牌成功', data.access_token);
+      saveToken(data.access_token);
+
+      // 获取用户信息并跳转
+      const userStore = useUserStore();
+      await userStore.fetchInfo();
+      router.push('/'); // 跳转到首页
+    }
 
   } catch (error) {
     console.error('获取访问令牌失败', error)

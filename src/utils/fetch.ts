@@ -1,6 +1,7 @@
 // src/utils/http.ts
 import { invoke } from '@tauri-apps/api/core';
-
+import { getToken } from './token';
+import router from '@/router';
 export interface ApiResponse {
   success: boolean;
   code: number;
@@ -8,36 +9,38 @@ export interface ApiResponse {
   data?: any;
 }
 
-type HttpMethod = 'get' | 'post'|'GET'|'POST';
+type HttpMethod = 'get' | 'post' | 'GET' | 'POST';
 
 interface HttpOptions {
   method?: HttpMethod;
   body?: Record<string, any>;
   headers?: Record<string, string>;
 }
-
+const baseUrl = import.meta.env.VITE_APP_BASE_API;
 /**
  * 统一的请求方法，支持 GET / POST，并自动附带本地 token
  */
-export async function $fetch(url:string,options: HttpOptions): Promise<ApiResponse> {
+export async function $fetch(url: string, options: HttpOptions): Promise<ApiResponse> {
   const { method = 'get', body, headers = {} } = options;
+  const fullUrl = `${baseUrl}${url}`;
 
   // 自动添加 token
-  const token = localStorage.getItem('access_token');
+  const token = getToken();
   if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const invokeName = method === 'post' ? 'http_post' : 'http_get';
+  const invokeName = method.toLowerCase() === 'post' ? 'http_post' : 'http_get';
 
-  const response =  await invoke<ApiResponse>(invokeName, {
-    path:url,
+  const response = await invoke<ApiResponse>(invokeName, {
+    url: fullUrl,
     body,
     headers,
   });
-  if(response.success){
-    return response.data;
-  }else{
-    throw new Error(response.message);  
+  if (response.success) {
+    return response;
+  } else {
+    router.push('/login');
+    throw new Error(response.message);
   }
 }
