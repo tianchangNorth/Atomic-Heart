@@ -1,169 +1,214 @@
 <template>
-  <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+  <Card class="w-80 h-[600px] flex flex-col overflow-hidden shadow-lg">
     <!-- 通知头部 -->
-    <div class="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
+    <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-white flex items-center">
-          <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
-          </svg>
-          消息通知
-        </h3>
-        <div class="flex items-center space-x-3">
-          <span class="bg-white/20 text-white text-xs px-2 py-1 rounded-full">
-            {{ unreadCount }} 条未读
-          </span>
-          <button 
-            @click="markAllAsRead" 
-            class="text-white/80 hover:text-white text-sm transition-colors"
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+            </svg>
+          </div>
+          <div>
+            <CardTitle class="text-lg">通知</CardTitle>
+            <CardDescription class="text-xs">
+              {{ unreadCount > 0 ? `${unreadCount} 条未读消息` : '暂无未读消息' }}
+            </CardDescription>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-1">
+          <Button
             v-if="unreadCount > 0"
+            variant="ghost"
+            size="sm"
+            @click="markAllAsRead"
+            class="text-xs h-8 px-2"
           >
             全部已读
-          </button>
-          <!-- 关闭按钮 -->
-          <button 
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             @click="$emit('close')"
-            class="text-white/80 hover:text-white transition-colors p-1 rounded-md hover:bg-white/10"
-            title="关闭通知面板"
+            class="h-8 w-8 p-0"
           >
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </CardHeader>
 
     <!-- 通知列表 -->
-    <div class="max-h-96 overflow-y-auto">
-      <div v-if="notifications.length === 0" class="p-8 text-center text-gray-500">
-        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
-        </svg>
-        <p>暂无消息通知</p>
-      </div>
-      
-      <div v-else>
-        <div 
-          v-for="notification in notifications" 
-          :key="notification.id"
-          class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-        >
-          <div class="p-4 flex items-start space-x-3">
-            <!-- 通知图标 -->
-            <div class="flex-shrink-0">
-              <div 
-                :class="getNotificationIconClass(notification.type)"
-                class="w-8 h-8 rounded-full flex items-center justify-center"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path v-if="notification.type === 'issue'" d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                  <path v-else-if="notification.type === 'pr'" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  <path v-else-if="notification.type === 'mention'" d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
-                  <path v-else d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"/>
-                </svg>
-              </div>
-            </div>
-            
-            <!-- 通知内容 -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-gray-900 truncate">
-                  {{ notification.title }}
-                </p>
-                <div class="flex items-center space-x-2">
-                  <span v-if="!notification.read" class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                  <span class="text-xs text-gray-500">
-                    {{ formatTime(notification.created_at) }}
-                  </span>
+    <CardContent class="flex-1 overflow-hidden p-0">
+      <div class="h-full overflow-y-auto">
+        <!-- 空状态 -->
+        <div v-if="notifications.length === 0" class="flex flex-col items-center justify-center h-full p-6 text-center">
+          <div class="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+            </svg>
+          </div>
+          <h3 class="text-sm font-medium text-foreground mb-1">暂无通知</h3>
+          <p class="text-xs text-muted-foreground">当有新的活动时，通知会显示在这里</p>
+        </div>
+
+        <!-- 通知列表 -->
+        <div v-else class="divide-y divide-border">
+          <div
+            v-for="notification in notifications"
+            :key="notification.id"
+            class="p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
+            @click="handleNotificationClick(notification)"
+          >
+            <div class="flex items-start space-x-3">
+              <!-- 通知图标 -->
+              <div class="flex-shrink-0 mt-0.5">
+                <div
+                  :class="getNotificationIconClass(notification.type)"
+                  class="w-8 h-8 rounded-full flex items-center justify-center"
+                >
+                  <!-- Issue 图标 -->
+                  <svg v-if="notification.type === 'issue'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                  </svg>
+                  <!-- PR 图标 -->
+                  <svg v-else-if="notification.type === 'pr'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <!-- 提及图标 -->
+                  <svg v-else-if="notification.type === 'mention'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                  <!-- 系统通知图标 -->
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
                 </div>
               </div>
-              <p class="text-sm text-gray-600 mt-1 line-clamp-2">
-                {{ notification.content }}
-              </p>
-              <div class="flex items-center mt-2 space-x-2">
-                <span 
-                  :class="getNotificationTypeClass(notification.type)"
-                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                >
-                  {{ getNotificationTypeText(notification.type) }}
-                </span>
-                <span v-if="notification.repository" class="text-xs text-gray-500">
-                  来自 {{ notification.repository }}
-                </span>
+
+              <!-- 通知内容 -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between mb-1">
+                  <h4 class="text-sm font-medium text-foreground line-clamp-1 pr-2">
+                    {{ notification.title }}
+                  </h4>
+                  <div class="flex items-center space-x-2 flex-shrink-0">
+                    <div v-if="!notification.read" class="w-2 h-2 bg-primary rounded-full"></div>
+                    <span class="text-xs text-muted-foreground">
+                      {{ formatTime(notification.created_at) }}
+                    </span>
+                  </div>
+                </div>
+
+                <p class="text-xs text-muted-foreground line-clamp-2 mb-2">
+                  {{ notification.content }}
+                </p>
+
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <Badge
+                      :variant="getNotificationBadgeVariant(notification.type)"
+                      class="text-xs"
+                    >
+                      {{ getNotificationTypeText(notification.type) }}
+                    </Badge>
+                    <span v-if="notification.repository" class="text-xs text-muted-foreground">
+                      {{ notification.repository }}
+                    </span>
+                  </div>
+
+                  <!-- 操作按钮 -->
+                  <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      v-if="!notification.read"
+                      variant="ghost"
+                      size="sm"
+                      @click.stop="markAsRead(notification.id)"
+                      class="h-6 w-6 p-0"
+                    >
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      @click.stop="dismissNotification(notification.id)"
+                      class="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-            
-            <!-- 操作按钮 -->
-            <div class="flex-shrink-0 flex flex-col space-y-1">
-              <button 
-                @click="markAsRead(notification.id)"
-                v-if="!notification.read"
-                class="text-gray-400 hover:text-green-600 transition-colors p-1 rounded-md hover:bg-green-50"
-                title="标记为已读"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-              </button>
-              <button 
-                @click="dismissNotification(notification.id)"
-                class="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                title="删除通知"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </CardContent>
     
     <!-- 底部操作 -->
-    <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
-      <div class="flex justify-between items-center">
-        <button 
-          @click="loadMore"
+    <CardFooter class="p-3 border-t border-border bg-muted/30">
+      <div class="flex justify-between items-center w-full">
+        <Button
           v-if="hasMore"
-          class="text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+          variant="ghost"
+          size="sm"
+          @click="loadMore"
+          :disabled="loading"
+          class="text-xs h-8"
         >
-          <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          <svg v-if="loading" class="w-3 h-3 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <svg v-else class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
           </svg>
           加载更多
-        </button>
-        <div class="flex items-center space-x-2">
-          <button 
+        </Button>
+
+        <div class="flex items-center space-x-1">
+          <Button
+            variant="ghost"
+            size="sm"
             @click="refreshNotifications"
-            class="text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
+            :disabled="loading"
+            class="h-8 w-8 p-0"
           >
-            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+            <svg class="w-3 h-3" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            刷新
-          </button>
-          <button 
-            @click="clearAllNotifications"
+          </Button>
+
+          <Button
             v-if="notifications.length > 0"
-            class="text-sm text-red-600 hover:text-red-800 transition-colors flex items-center"
+            variant="ghost"
+            size="sm"
+            @click="clearAllNotifications"
+            class="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
           >
-            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
-              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 3a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
             </svg>
-            清空全部
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
-  </div>
+    </CardFooter>
+  </Card>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { $fetch } from '@/utils/fetch';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface Notification {
   id: string;
@@ -196,22 +241,22 @@ watch(unreadCount, (newCount) => {
 
 const getNotificationIconClass = (type: string) => {
   const classes = {
-    issue: 'bg-red-100 text-red-600',
-    pr: 'bg-green-100 text-green-600',
-    mention: 'bg-blue-100 text-blue-600',
-    system: 'bg-gray-100 text-gray-600'
+    issue: 'bg-destructive/10 text-destructive',
+    pr: 'bg-green-500/10 text-green-600',
+    mention: 'bg-blue-500/10 text-blue-600',
+    system: 'bg-muted text-muted-foreground'
   };
   return classes[type as keyof typeof classes] || classes.system;
 };
 
-const getNotificationTypeClass = (type: string) => {
-  const classes = {
-    issue: 'bg-red-100 text-red-800',
-    pr: 'bg-green-100 text-green-800',
-    mention: 'bg-blue-100 text-blue-800',
-    system: 'bg-gray-100 text-gray-800'
+const getNotificationBadgeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  const variants = {
+    issue: 'destructive' as const,
+    pr: 'default' as const,
+    mention: 'secondary' as const,
+    system: 'outline' as const
   };
-  return classes[type as keyof typeof classes] || classes.system;
+  return variants[type as keyof typeof variants] || variants.system;
 };
 
 const getNotificationTypeText = (type: string) => {
@@ -352,6 +397,16 @@ const loadMore = async () => {
 
 const refreshNotifications = () => {
   fetchNotifications();
+};
+
+const handleNotificationClick = (notification: Notification) => {
+  // 点击通知时自动标记为已读
+  if (!notification.read) {
+    markAsRead(notification.id);
+  }
+
+  // 这里可以添加跳转到相关页面的逻辑
+  console.log('Clicked notification:', notification);
 };
 
 onMounted(() => {

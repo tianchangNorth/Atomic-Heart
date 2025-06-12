@@ -1,179 +1,195 @@
 <template>
-  <div class="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 overflow-hidden">
+  <div class="h-screen bg-background flex flex-col overflow-hidden">
     <!-- 顶部导航栏 -->
-    <header class="bg-white/80 backdrop-blur-sm shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header class="bg-card border-b border-border shadow-sm">
+      <div class="px-6">
         <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <h1 class="text-xl font-semibold text-gray-900">开发者工作台</h1>
+          <!-- 左侧：品牌标识和搜索 -->
+          <div class="flex items-center space-x-8">
+            <div class="flex items-center space-x-3">
+              <!-- AtomGit Logo -->
+              <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+              </div>
+              <h1 class="text-xl font-bold text-foreground">AtomGit</h1>
+            </div>
+
+            <!-- 快速搜索 -->
+            <div class="hidden md:flex items-center">
+              <div class="relative">
+                <input
+                  type="text"
+                  placeholder="搜索仓库、用户..."
+                  class="w-80 px-4 py-2 pl-10 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                >
+                <svg class="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+            </div>
           </div>
+
+          <!-- 右侧：用户操作区域 -->
           <div class="flex items-center space-x-4">
-            <!-- 消息通知切换按钮 -->
-            <button 
+            <!-- 新建按钮 -->
+            <Button variant="default" size="sm" class="hidden md:flex">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              新建
+            </Button>
+
+            <!-- 通知按钮 -->
+            <button
               @click="toggleNotificationPanel"
-              class="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              class="relative p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
               :title="showNotifications ? '隐藏通知' : '显示通知'"
             >
-              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
               </svg>
-              <!-- 未读消息红点提示 -->
-              <span 
-                v-if="unreadNotificationCount > 0" 
-                class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
+              <span
+                v-if="unreadNotificationCount > 0"
+                class="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
               >
                 {{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}
               </span>
             </button>
-            
-            <span class="text-sm text-gray-700">欢迎，{{ user.name || '用户' }}</span>
-            <button @click="logout" class="text-sm text-red-600 hover:text-red-800 transition-colors">
-              退出登录
-            </button>
+
+            <!-- 用户菜单 -->
+            <div class="flex items-center space-x-3">
+              <img
+                v-if="user.avatar_url"
+                :src="user.avatar_url"
+                :alt="user.name || '用户头像'"
+                class="w-8 h-8 rounded-full border border-border"
+              >
+              <div v-else class="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                <svg class="w-4 h-4 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div class="hidden md:block">
+                <p class="text-sm font-medium text-foreground">{{ user.name || '用户' }}</p>
+                <p class="text-xs text-muted-foreground">{{ user.email || '' }}</p>
+              </div>
+              <button @click="logout" class="text-muted-foreground hover:text-destructive transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </header>
 
-    <div class="flex-1 flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-4rem)]" :class="showNotifications ? 'space-x-4' : 'space-x-8'">
-      <!-- 左侧：用户资料和Tab内容 -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <!-- 用户资料卡片 -->
-        <div class="flex-shrink-0 bg-white rounded-2xl shadow-xl border border-gray-100 mb-8" :class="showNotifications ? 'p-6' : 'p-8'">
-          <div class="flex flex-col" :class="showNotifications ? 'xl:flex-row xl:space-y-0 xl:space-x-6 space-y-6' : 'lg:flex-row lg:space-y-0 lg:space-x-12 space-y-8'">
-            <!-- 头像和基本信息 -->
-            <div class="flex items-center" :class="showNotifications ? 'space-x-4' : 'space-x-6'">
-              <div class="relative">
-                <img 
-                  v-if="user.avatar_url" 
-                  :src="user.avatar_url" 
-                  :alt="user.name || '用户头像'"
-                  :class="showNotifications ? 'w-16 h-16' : 'w-24 h-24'"
-                  class="rounded-full object-cover ring-4 ring-blue-100 transition-all duration-300"
-                />
-                <div 
-                  v-else
-                  :class="showNotifications ? 'w-16 h-16' : 'w-24 h-24'"
-                  class="bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center ring-4 ring-blue-100 transition-all duration-300"
-                >
-                  <span class="text-white font-bold" :class="showNotifications ? 'text-lg' : 'text-2xl'">
-                    {{ (user.name || 'U').charAt(0).toUpperCase() }}
-                  </span>
-                </div>
-                <div class="absolute -bottom-1 -right-1 bg-green-500 rounded-full border-2 border-white transition-all duration-300" :class="showNotifications ? 'w-4 h-4' : 'w-6 h-6'"></div>
+    <!-- 主体布局 -->
+    <div class="flex-1 flex overflow-hidden">
+      <!-- 侧边栏导航 -->
+      <aside class="w-64 bg-card border-r border-border flex-shrink-0">
+        <div class="p-6">
+          <!-- 用户信息简要展示 -->
+          <div class="mb-8">
+            <div class="flex items-center space-x-3 mb-4">
+              <img
+                v-if="user.avatar_url"
+                :src="user.avatar_url"
+                :alt="user.name || '用户头像'"
+                class="w-12 h-12 rounded-full border border-border"
+              >
+              <div v-else class="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                </svg>
               </div>
-              
               <div class="flex-1 min-w-0">
-                <h2 class="font-bold text-gray-900 mb-2 truncate transition-all duration-300" :class="showNotifications ? 'text-xl' : 'text-3xl'">
-                  {{ user.name || '未知用户' }}
-                </h2>
-                <p class="text-gray-600 mb-3 line-clamp-2 transition-all duration-300" :class="showNotifications ? 'text-sm' : 'text-lg'">
-                  {{ user.bio || '这个人很懒，什么都没有留下...' }}
-                </p>
-                <div class="flex flex-wrap text-gray-500 transition-all duration-300" :class="showNotifications ? 'gap-2 text-xs' : 'gap-4 text-sm'">
-                  <span v-if="user.followers !== undefined" class="flex items-center">
-                    <svg :class="showNotifications ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-1'" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    {{ user.followers }} 关注者
-                  </span>
-                  <span v-if="user.following !== undefined" class="flex items-center">
-                    <svg :class="showNotifications ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-1'" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z"/>
-                    </svg>
-                    {{ user.following }} 正在关注
-                  </span>
-                  <span v-if="user.total_repos !== undefined" class="flex items-center">
-                    <svg :class="showNotifications ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-1'" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
-                    </svg>
-                    {{ user.total_repos }} 仓库
-                  </span>
-                </div>
+                <h3 class="font-semibold text-foreground truncate">{{ user.name || '用户' }}</h3>
+                <p class="text-sm text-muted-foreground truncate">{{ user.bio || '暂无简介' }}</p>
               </div>
             </div>
 
-            <!-- 联系信息 -->
-            <div :class="showNotifications ? 'xl:ml-auto space-y-2' : 'lg:ml-auto space-y-3'">
-              <div v-if="user.email" class="flex items-center space-x-3 text-gray-700">
-                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
-                </svg>
-                <a :href="`mailto:${user.email}`" class="hover:text-blue-600 transition-colors truncate" :class="showNotifications ? 'text-sm' : 'text-base'">
-                  {{ user.email }}
-                </a>
+            <!-- 用户统计 -->
+            <div class="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div class="text-lg font-bold text-foreground">{{ user.total_repos || 0 }}</div>
+                <div class="text-xs text-muted-foreground">仓库</div>
               </div>
-              
-              <div v-if="user.location" class="flex items-center space-x-3 text-gray-700">
-                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-                </svg>
-                <span class="truncate" :class="showNotifications ? 'text-sm' : 'text-base'">
-                  {{ user.location }}
-                </span>
+              <div>
+                <div class="text-lg font-bold text-foreground">{{ user.followers || 0 }}</div>
+                <div class="text-xs text-muted-foreground">关注者</div>
               </div>
-              
-              <div v-if="user.html_url" class="flex items-center space-x-3 text-gray-700">
-                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/>
-                </svg>
-                <a :href="user.html_url" target="_blank" class="hover:text-blue-600 transition-colors flex items-center truncate" :class="showNotifications ? 'text-sm' : 'text-base'">
-                  查看主页
-                  <svg class="w-3 h-3 ml-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                  </svg>
-                </a>
-              </div>
-              
-              <div v-if="user.id" class="text-xs text-gray-400 pt-2">
-                ID: {{ user.id }}
+              <div>
+                <div class="text-lg font-bold text-foreground">{{ user.following || 0 }}</div>
+                <div class="text-xs text-muted-foreground">关注中</div>
               </div>
             </div>
           </div>
+
+          <!-- 导航菜单 -->
+          <nav class="space-y-2">
+            <button
+              v-for="item in navigationItems"
+              :key="item.path"
+              @click="navigateToTab(item.path)"
+              :class="getNavItemClass(item.path)"
+              class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <!-- 概览图标 -->
+              <svg v-if="item.path === '/overview'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+              </svg>
+              <!-- 仓库图标 -->
+              <svg v-else-if="item.path === '/repositories'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+              </svg>
+              <!-- Issues图标 -->
+              <svg v-else-if="item.path === '/issues'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+              </svg>
+              <!-- 项目图标 -->
+              <svg v-else-if="item.path === '/projects'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+              </svg>
+
+              <span>{{ item.label }}</span>
+              <span v-if="item.badge" class="ml-auto bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
+                {{ item.badge }}
+              </span>
+            </button>
+          </nav>
+
+          <!-- 快速操作 -->
+          <div class="mt-8 space-y-3">
+            <h4 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">快速操作</h4>
+            <Button variant="outline" size="sm" class="w-full justify-start">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              新建仓库
+            </Button>
+            <Button variant="outline" size="sm" class="w-full justify-start">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              加入组织
+            </Button>
+            <Button variant="outline" size="sm" class="w-full justify-start">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+              </svg>
+              导入仓库
+            </Button>
+          </div>
         </div>
+      </aside>
 
-        <!-- Tab导航和内容 -->
-        <div class="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
-          <MenubarRoot class="border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
-            <MenubarMenu>
-              <MenubarTrigger 
-                :class="getTabClass('/overview')"
-                @click="navigateToTab('/overview')"
-              >
-                概览
-              </MenubarTrigger>
-            </MenubarMenu>
-            
-            <MenubarMenu>
-              <MenubarTrigger 
-                :class="getTabClass('/issues')"
-                @click="navigateToTab('/issues')"
-              >
-                Issues
-              </MenubarTrigger>
-            </MenubarMenu>
-            
-            <MenubarMenu>
-              <MenubarTrigger 
-                :class="getTabClass('/repositories')"
-                @click="navigateToTab('/repositories')"
-              >
-                仓库
-              </MenubarTrigger>
-            </MenubarMenu>
-            
-            <MenubarMenu>
-              <MenubarTrigger 
-                :class="getTabClass('/projects')"
-                @click="navigateToTab('/projects')"
-              >
-                项目
-              </MenubarTrigger>
-            </MenubarMenu>
-          </MenubarRoot>
-
+      <!-- 主内容区域 -->
+      <main class="flex-1 flex overflow-hidden" :class="showNotifications ? 'mr-4' : ''">
+        <!-- 内容容器 -->
+        <div class="flex-1 bg-card rounded-lg border border-border overflow-hidden flex flex-col m-6">
           <!-- 路由视图容器 -->
           <div class="flex-1 overflow-y-auto">
             <div class="p-6">
@@ -181,7 +197,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <!-- 右侧：消息通知面板 -->
       <Transition
@@ -192,8 +208,8 @@
         leave-from-class="transform translate-x-0 opacity-100"
         leave-to-class="transform translate-x-full opacity-0"
       >
-        <div v-if="showNotifications" class="flex-shrink-0" :class="showNotifications ? 'w-80' : 'w-96'">
-          <NotificationPanel 
+        <div v-if="showNotifications" class="flex-shrink-0 w-80">
+          <NotificationPanel
             @close="hideNotificationPanel"
             @unread-count-change="updateUnreadCount"
           />
@@ -204,14 +220,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useUserStore } from '@/stores/index';
-import {
-  MenubarRoot,
-  MenubarMenu,
-  MenubarTrigger
-} from 'reka-ui';
+import { Button } from '@/components/ui/button';
 import { delToken } from '@/utils/token';
 import NotificationPanel from '@/components/ui/notification/NotificationPanel.vue';
 
@@ -223,6 +235,30 @@ const userStore = useUserStore();
 const { user } = userStore;
 const showNotifications = ref(false);
 const unreadNotificationCount = ref(0);
+
+// 导航项配置
+const navigationItems = computed(() => [
+  {
+    path: '/overview',
+    label: '概览',
+    badge: null
+  },
+  {
+    path: '/repositories',
+    label: '仓库',
+    badge: user.total_repos || 0
+  },
+  {
+    path: '/issues',
+    label: 'Issues',
+    badge: null
+  },
+  {
+    path: '/projects',
+    label: '项目',
+    badge: null
+  }
+]);
 
 // 消息通知面板控制
 const toggleNotificationPanel = () => {
@@ -242,13 +278,12 @@ const navigateToTab = (path: string) => {
   router.push(path);
 };
 
-const getTabClass = (path: string) => {
+const getNavItemClass = (path: string) => {
   const isActive = route.path === path;
   return [
-    'px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer',
     isActive
-      ? 'bg-blue-100 text-blue-700 border-blue-200'
-      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      ? 'bg-primary text-primary-foreground'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
   ];
 };
 
@@ -274,17 +309,16 @@ onMounted(async () => {
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: hsl(var(--muted));
   border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 </style>
-import { NotificationPanel } from '@/components/ui/notification';
