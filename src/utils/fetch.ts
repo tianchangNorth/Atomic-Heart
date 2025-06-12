@@ -13,7 +13,7 @@ type HttpMethod = 'get' | 'post' | 'GET' | 'POST';
 
 interface HttpOptions {
   method?: HttpMethod;
-  body?: Record<string, any>;
+  data?: Record<string, any>;
   headers?: Record<string, string>;
 }
 const baseUrl = import.meta.env.VITE_APP_BASE_API;
@@ -21,7 +21,7 @@ const baseUrl = import.meta.env.VITE_APP_BASE_API;
  * 统一的请求方法，支持 GET / POST，并自动附带本地 token
  */
 export async function $fetch(url: string, options: HttpOptions): Promise<ApiResponse> {
-  const { method = 'get', body, headers = {} } = options;
+  const { method = 'get', data, headers = {} } = options;
   const fullUrl = `${baseUrl}${url}`;
 
   // 自动添加 token
@@ -34,7 +34,7 @@ export async function $fetch(url: string, options: HttpOptions): Promise<ApiResp
 
   const response = await invoke<ApiResponse>(invokeName, {
     url: fullUrl,
-    body,
+    data,
     headers,
   });
   if (response.success) {

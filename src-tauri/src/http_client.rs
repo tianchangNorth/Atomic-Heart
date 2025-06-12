@@ -34,8 +34,14 @@ pub struct TokenResponse {
 pub async fn http_get(
     url: String,
     headers: Option<HashMap<String, String>>,
+    data: Option<HashMap<String, serde_json::Value>>, // 新增参数
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     let mut request = HTTP_CLIENT.get(&url);
+
+    // 添加查询参数
+    if let Some(params_map) = data {
+        request = request.query(&params_map);
+    }
 
     if let Some(headers_map) = headers {
         for (key, value) in headers_map {
@@ -52,7 +58,7 @@ pub async fn http_get(
 #[command]
 pub async fn http_post(
     url: String,
-    body: Option<serde_json::Value>,
+    data: Option<serde_json::Value>,
     headers: Option<HashMap<String, String>>,
 ) -> Result<ApiResponse<serde_json::Value>, String> {
     // 使用具体类型 serde_json::Value
@@ -64,7 +70,7 @@ pub async fn http_post(
         }
     }
 
-    if let Some(json_body) = body {
+    if let Some(json_body) = data {
         request = request.json(&json_body);
     }
 

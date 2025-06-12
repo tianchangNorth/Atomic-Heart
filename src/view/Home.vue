@@ -291,7 +291,7 @@ onMounted(async () => {
         leave-from-class="transform translate-x-0 opacity-100"
         leave-to-class="transform translate-x-full opacity-0"
       >
-        <div v-if="showNotifications" class="flex-shrink-0 w-80">
+        <div v-if="showNotifications" class="flex-shrink-0 w-80 mt-6">
           <NotificationPanel
             @close="hideNotificationPanel"
             @unread-count-change="updateUnreadCount"

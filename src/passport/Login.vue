@@ -60,7 +60,7 @@ const handleCallback = async () => {
   try {
     const response = await $fetch('/login/oauth/access_token ', {
       method: 'POST',
-      body: {
+      data: {
         client_id: oauthConfig.clientId,
         client_secret: oauthConfig.clientSecret,
         code: authCode.value,

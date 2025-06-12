@@ -1,3 +1,237 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue';
+import { $fetch } from '@/utils/fetch';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+// 新的通知数据结构
+interface Notification {
+  id: string;                    // 通知唯一标识
+  content: string;               // 通知内容（包含HTML）
+  unread: boolean;               // 是否未读
+  updated_at: string;            // 更新时间
+  url: string;                   // API地址
+  html_url: string;              // 网页地址
+  sender: {                      // 发送者信息
+    login: string;               // 用户名
+    id: string;                  // 用户ID
+    avatar_url: string;          // 头像URL
+    html_url: string;            // 用户主页
+  };
+}
+
+// 定义事件
+const emit = defineEmits<{
+  close: [];
+  'unread-count-change': [count: number];
+}>();
+
+const notifications = ref<Notification[]>([]);
+const hasMore = ref(false);
+const loading = ref(false);
+
+const unreadCount = computed(() => {
+  return notifications.value.filter(n => n.unread).length;
+});
+
+// 监听未读数量变化，通知父组件
+watch(unreadCount, (newCount) => {
+  emit('unread-count-change', newCount);
+}, { immediate: true });
+
+// 从通知内容中提取通知类型
+const getNotificationType = (content: string): string => {
+  const lowerContent = content.toLowerCase();
+  if (lowerContent.includes('issue') || lowerContent.includes('问题')) {
+    return 'issue';
+  } else if (lowerContent.includes('pull request') || lowerContent.includes('pr') || lowerContent.includes('合并请求')) {
+    return 'pr';
+  } else if (lowerContent.includes('mention') || lowerContent.includes('提及') || lowerContent.includes('@')) {
+    return 'mention';
+  } else if (lowerContent.includes('star') || lowerContent.includes('fork') || lowerContent.includes('watch')) {
+    return 'activity';
+  }
+  return 'system';
+};
+
+const getNotificationIconClass = (content: string) => {
+  const type = getNotificationType(content);
+  const classes = {
+    issue: 'bg-destructive/10 text-destructive',
+    pr: 'bg-green-500/10 text-green-600',
+    mention: 'bg-blue-500/10 text-blue-600',
+    activity: 'bg-purple-500/10 text-purple-600',
+    system: 'bg-muted text-muted-foreground'
+  };
+  return classes[type as keyof typeof classes] || classes.system;
+};
+
+const getNotificationBadgeVariant = (content: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  const type = getNotificationType(content);
+  const variants = {
+    issue: 'destructive' as const,
+    pr: 'default' as const,
+    mention: 'secondary' as const,
+    activity: 'outline' as const,
+    system: 'outline' as const
+  };
+  return variants[type as keyof typeof variants] || variants.system;
+};
+
+const getNotificationTypeText = (content: string) => {
+  const type = getNotificationType(content);
+  const texts = {
+    issue: 'Issue',
+    pr: 'Pull Request',
+    mention: '提及',
+    activity: '活动',
+    system: '系统通知'
+  };
+  return texts[type as keyof typeof texts] || '通知';
+};
+
+const formatTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (minutes < 1) {
+    return '刚刚';
+  } else if (minutes < 60) {
+    return `${minutes}分钟前`;
+  } else if (hours < 24) {
+    return `${hours}小时前`;
+  } else if (days < 7) {
+    return `${days}天前`;
+  } else {
+    return date.toLocaleDateString('zh-CN');
+  }
+};
+
+// 安全渲染HTML内容
+const sanitizeHtml = (html: string): string => {
+  // 简单的HTML清理，移除潜在危险的标签和属性
+  return html
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/javascript:/gi, '');
+};
+
+const fetchNotifications = async () => {
+  try {
+    loading.value = true;
+    const { success, data } = await $fetch('/notifications/messages', {
+      method: 'get',
+      data: {
+        per_page: 10
+      }
+    });
+    if (success) {
+      notifications.value = data.list || [];
+      console.log('获取通知成功:', data);
+      hasMore.value = data.hasMore || false;
+    } else {
+      // API 失败时使用模拟数据
+    }
+  } catch (error) {
+    console.error('获取通知失败:', error);
+    // 使用模拟数据作为降级方案
+  } finally {
+    loading.value = false;
+  }
+};
+
+const markAsRead = async (notificationId: string) => {
+  try {
+    await $fetch(`/notifications/${notificationId}/read`, { method: 'post' });
+    const notification = notifications.value.find(n => n.id === notificationId);
+    if (notification) {
+      notification.unread = false;
+    }
+  } catch (error) {
+    console.error('标记已读失败:', error);
+    // 本地更新用于演示
+    const notification = notifications.value.find(n => n.id === notificationId);
+    if (notification) {
+      notification.unread = false;
+    }
+  }
+};
+
+const markAllAsRead = async () => {
+  try {
+    await $fetch('/notifications/read-all', { method: 'post' });
+    notifications.value.forEach(n => n.unread = false);
+  } catch (error) {
+    console.error('全部标记已读失败:', error);
+    // 本地更新用于演示
+    notifications.value.forEach(n => n.unread = false);
+  }
+};
+
+const dismissNotification = async (notificationId: string) => {
+  try {
+    await $fetch(`/notifications/${notificationId}`, { method: 'post' });
+    const index = notifications.value.findIndex(n => n.id === notificationId);
+    if (index > -1) {
+      notifications.value.splice(index, 1);
+    }
+  } catch (error) {
+    console.error('删除通知失败:', error);
+    // 本地删除用于演示
+    const index = notifications.value.findIndex(n => n.id === notificationId);
+    if (index > -1) {
+      notifications.value.splice(index, 1);
+    }
+  }
+};
+
+const clearAllNotifications = async () => {
+  try {
+    await $fetch('/notifications/clear-all', { method: 'post' });
+    notifications.value = [];
+  } catch (error) {
+    console.error('清空通知失败:', error);
+    // 本地清空用于演示
+    notifications.value = [];
+  }
+};
+
+const loadMore = async () => {
+  // 实现加载更多逻辑
+  console.log('加载更多通知');
+};
+
+const refreshNotifications = () => {
+  fetchNotifications();
+};
+
+const handleNotificationClick = (notification: Notification) => {
+  // 点击通知时自动标记为已读
+  if (notification.unread) {
+    markAsRead(notification.id);
+  }
+
+  // 跳转到通知对应的页面
+  if (notification.html_url) {
+    console.log('跳转到:', notification.html_url);
+    // 这里可以添加路由跳转逻辑
+    // router.push(notification.html_url);
+  }
+};
+
+onMounted(() => {
+  fetchNotifications();
+});
+</script>
+
 <template>
   <Card class="w-80 h-[600px] flex flex-col overflow-hidden shadow-lg">
     <!-- 通知头部 -->
@@ -64,70 +298,66 @@
             @click="handleNotificationClick(notification)"
           >
             <div class="flex items-start space-x-3">
-              <!-- 通知图标 -->
-              <div class="flex-shrink-0 mt-0.5">
-                <div
-                  :class="getNotificationIconClass(notification.type)"
-                  class="w-8 h-8 rounded-full flex items-center justify-center"
-                >
-                  <!-- Issue 图标 -->
-                  <svg v-if="notification.type === 'issue'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                  </svg>
-                  <!-- PR 图标 -->
-                  <svg v-else-if="notification.type === 'pr'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <!-- 提及图标 -->
-                  <svg v-else-if="notification.type === 'mention'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                  </svg>
-                  <!-- 系统通知图标 -->
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-              </div>
+              <!-- 发送者头像 -->
+              <Avatar size="sm" class="flex-shrink-0">
+                <AvatarImage
+                  :src="notification.sender.avatar_url"
+                  :alt="notification.sender.login"
+                />
+                <AvatarFallback class="text-xs">
+                  {{ notification.sender.login.charAt(0).toUpperCase() }}
+                </AvatarFallback>
+              </Avatar>
+
+              <!-- 通知类型图标 -->
 
               <!-- 通知内容 -->
               <div class="flex-1 min-w-0">
                 <div class="flex items-start justify-between mb-1">
-                  <h4 class="text-sm font-medium text-foreground line-clamp-1 pr-2">
-                    {{ notification.title }}
-                  </h4>
-                  <div class="flex items-center space-x-2 flex-shrink-0">
-                    <div v-if="!notification.read" class="w-2 h-2 bg-primary rounded-full"></div>
-                    <span class="text-xs text-muted-foreground">
-                      {{ formatTime(notification.created_at) }}
+                  <div class="flex items-center space-x-2 flex-1">
+                    <span class="text-sm font-medium text-foreground">
+                      {{ notification.sender.login }}
                     </span>
+                    <div v-if="notification.unread" class="w-2 h-2 bg-primary rounded-full"></div>
                   </div>
+                  <span class="text-xs text-muted-foreground flex-shrink-0">
+                    {{ formatTime(notification.updated_at) }}
+                  </span>
                 </div>
 
-                <p class="text-xs text-muted-foreground line-clamp-2 mb-2">
-                  {{ notification.content }}
-                </p>
+                <!-- 通知内容（安全渲染HTML） -->
+                <div
+                  class="text-sm text-foreground line-clamp-3 mb-2"
+                  v-html="sanitizeHtml(notification.content)"
+                ></div>
 
                 <div class="flex items-center justify-between">
                   <div class="flex items-center space-x-2">
                     <Badge
-                      :variant="getNotificationBadgeVariant(notification.type)"
+                      :variant="getNotificationBadgeVariant(notification.content)"
                       class="text-xs"
                     >
-                      {{ getNotificationTypeText(notification.type) }}
+                      {{ getNotificationTypeText(notification.content) }}
                     </Badge>
-                    <span v-if="notification.repository" class="text-xs text-muted-foreground">
-                      {{ notification.repository }}
-                    </span>
+                    <a
+                      v-if="notification.html_url"
+                      :href="notification.html_url"
+                      class="text-xs text-muted-foreground hover:text-primary transition-colors"
+                      @click.stop
+                    >
+                      查看详情
+                    </a>
                   </div>
 
                   <!-- 操作按钮 -->
                   <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
-                      v-if="!notification.read"
+                      v-if="notification.unread"
                       variant="ghost"
                       size="sm"
                       @click.stop="markAsRead(notification.id)"
                       class="h-6 w-6 p-0"
+                      title="标记为已读"
                     >
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -138,6 +368,7 @@
                       size="sm"
                       @click.stop="dismissNotification(notification.id)"
                       class="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      title="删除通知"
                     >
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -203,222 +434,44 @@
   </Card>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { $fetch } from '@/utils/fetch';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-
-interface Notification {
-  id: string;
-  type: 'issue' | 'pr' | 'mention' | 'system';
-  title: string;
-  content: string;
-  repository?: string;
-  read: boolean;
-  created_at: string;
-}
-
-// 定义事件
-const emit = defineEmits<{
-  close: [];
-  'unread-count-change': [count: number];
-}>();
-
-const notifications = ref<Notification[]>([]);
-const hasMore = ref(false);
-const loading = ref(false);
-
-const unreadCount = computed(() => {
-  return notifications.value.filter(n => !n.read).length;
-});
-
-// 监听未读数量变化，通知父组件
-watch(unreadCount, (newCount) => {
-  emit('unread-count-change', newCount);
-}, { immediate: true });
-
-const getNotificationIconClass = (type: string) => {
-  const classes = {
-    issue: 'bg-destructive/10 text-destructive',
-    pr: 'bg-green-500/10 text-green-600',
-    mention: 'bg-blue-500/10 text-blue-600',
-    system: 'bg-muted text-muted-foreground'
-  };
-  return classes[type as keyof typeof classes] || classes.system;
-};
-
-const getNotificationBadgeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
-  const variants = {
-    issue: 'default' as const,
-    pr: 'default' as const,
-    mention: 'secondary' as const,
-    system: 'outline' as const
-  };
-  return variants[type as keyof typeof variants] || variants.system;
-};
-
-const getNotificationTypeText = (type: string) => {
-  const texts = {
-    issue: 'Issue',
-    pr: 'Pull Request',
-    mention: '提及',
-    system: '系统通知'
-  };
-  return texts[type as keyof typeof texts] || '通知';
-};
-
-const formatTime = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-
-  const minutes = Math.floor(diff / (1000 * 60));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    return `${minutes}分钟前`;
-  } else if (hours < 24) {
-    return `${hours}小时前`;
-  } else if (days < 7) {
-    return `${days}天前`;
-  } else {
-    return date.toLocaleDateString('zh-CN');
-  }
-};
-
-const fetchNotifications = async () => {
-  try {
-    loading.value = true;
-    const { success, data } = await $fetch('/notifications', { method: 'get' });
-    if (success) {
-      notifications.value = data.notifications || [];
-      hasMore.value = data.hasMore || false;
-    }
-  } catch (error) {
-    console.error('获取通知失败:', error);
-    // 模拟数据用于演示
-    notifications.value = [
-      {
-        id: '1',
-        type: 'issue',
-        title: '新的Issue被分配给您',
-        content: '在项目 "tauri-app" 中，Issue #123 "修复登录问题" 已被分配给您处理。',
-        repository: 'tauri-app',
-        read: false,
-        created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-      },
-      {
-        id: '2',
-        type: 'pr',
-        title: 'Pull Request 需要您的审核',
-        content: 'PR #45 "添加用户认证功能" 正在等待您的代码审核。',
-        repository: 'tauri-app',
-        read: false,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
-      },
-      {
-        id: '3',
-        type: 'mention',
-        title: '有人在评论中提及了您',
-        content: '@您的用户名 请帮忙看一下这个问题的解决方案。',
-        repository: 'tauri-app',
-        read: true,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-      }
-    ];
-  } finally {
-    loading.value = false;
-  }
-};
-
-const markAsRead = async (notificationId: string) => {
-  try {
-    await $fetch(`/notifications/${notificationId}/read`, { method: 'post' });
-    const notification = notifications.value.find(n => n.id === notificationId);
-    if (notification) {
-      notification.read = true;
-    }
-  } catch (error) {
-    console.error('标记已读失败:', error);
-    // 本地更新用于演示
-    const notification = notifications.value.find(n => n.id === notificationId);
-    if (notification) {
-      notification.read = true;
-    }
-  }
-};
-
-const markAllAsRead = async () => {
-  try {
-    await $fetch('/notifications/read-all', { method: 'post' });
-    notifications.value.forEach(n => n.read = true);
-  } catch (error) {
-    console.error('全部标记已读失败:', error);
-    // 本地更新用于演示
-    notifications.value.forEach(n => n.read = true);
-  }
-};
-
-const dismissNotification = async (notificationId: string) => {
-  try {
-    await $fetch(`/notifications/${notificationId}`, { method: 'post' });
-    const index = notifications.value.findIndex(n => n.id === notificationId);
-    if (index > -1) {
-      notifications.value.splice(index, 1);
-    }
-  } catch (error) {
-    console.error('删除通知失败:', error);
-    // 本地删除用于演示
-    const index = notifications.value.findIndex(n => n.id === notificationId);
-    if (index > -1) {
-      notifications.value.splice(index, 1);
-    }
-  }
-};
-
-const clearAllNotifications = async () => {
-  try {
-    await $fetch('/notifications/clear-all', { method: 'post' });
-    notifications.value = [];
-  } catch (error) {
-    console.error('清空通知失败:', error);
-    // 本地清空用于演示
-    notifications.value = [];
-  }
-};
-
-const loadMore = async () => {
-  // 实现加载更多逻辑
-  console.log('加载更多通知');
-};
-
-const refreshNotifications = () => {
-  fetchNotifications();
-};
-
-const handleNotificationClick = (notification: Notification) => {
-  // 点击通知时自动标记为已读
-  if (!notification.read) {
-    markAsRead(notification.id);
-  }
-
-  // 这里可以添加跳转到相关页面的逻辑
-  console.log('Clicked notification:', notification);
-};
-
-onMounted(() => {
-  fetchNotifications();
-});
-</script>
-
 <style scoped>
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 通知内容中的HTML样式 */
+.line-clamp-3 :deep(a) {
+  color: hsl(var(--primary));
+  text-decoration: none;
+}
+
+.line-clamp-3 :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.line-clamp-3 :deep(strong) {
+  font-weight: 600;
+}
+
+.line-clamp-3 :deep(em) {
+  font-style: italic;
+}
+
+.line-clamp-3 :deep(code) {
+  background-color: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
 }
 </style>
