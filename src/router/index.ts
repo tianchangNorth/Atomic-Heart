@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useUserStore } from '../stores/index';
+import { delToken } from '../utils/token';
 
 import Login from '@/passport/Login.vue'
-import CallBack from '@/passport/CallBack.vue'
 import Home from '@/view/Home.vue'
 import Overview from '@/view/Overview.vue'
 import Issues from '@/view/Issues.vue'
@@ -22,7 +22,6 @@ const routes = [
     ]
   },
   { path: '/login', component: Login },
-  { path: '/callback', component: CallBack },
 ]
 
 const router = createRouter({
@@ -47,11 +46,13 @@ router.beforeEach(async (to) => {
     // 尝试获取用户信息
     const { success } = await userStore.fetchInfo();
     if (!success) {
+      delToken();
       return '/login'; // 重定向到登录页
     }
     return true;
   } catch (error) {
-    console.error('Router guard error:', error);
+    delToken();
+    // console.error('Router guard error:', error);
     // 出错时也重定向到登录页，而不是阻止路由
     return '/login';
   }
