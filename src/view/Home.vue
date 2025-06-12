@@ -221,7 +221,7 @@ const userStore = useUserStore();
 
 // 响应式数据
 const { user } = userStore;
-const showNotifications = ref(true);
+const showNotifications = ref(false);
 const unreadNotificationCount = ref(0);
 
 // 消息通知面板控制

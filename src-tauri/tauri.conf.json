@@ -14,11 +14,12 @@
       {
         "title": "tauri-app",
         "width": 1200,
-        "height": 1000
+        "height": 1000,
+        "devtools": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": null 
     }
   },
   "bundle": {
