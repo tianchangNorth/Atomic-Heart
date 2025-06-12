@@ -1,3 +1,86 @@
+<script setup lang="ts">
+import { onMounted, ref, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useUserStore } from '@/stores/index';
+import { Button } from '@/components/ui/button';
+import { delToken } from '@/utils/token';
+import NotificationPanel from '@/components/ui/notification/NotificationPanel.vue';
+
+const router = useRouter();
+const route = useRoute();
+const userStore = useUserStore();
+
+// 响应式数据
+const { user } = userStore;
+const showNotifications = ref(false);
+const unreadNotificationCount = ref(0);
+
+// 导航项配置
+const navigationItems = computed(() => [
+  {
+    path: '/overview',
+    label: '概览',
+    badge: null
+  },
+  {
+    path: '/repositories',
+    label: '仓库',
+    badge: user.total_repos || 0
+  },
+  {
+    path: '/issues',
+    label: 'Issues',
+    badge: null
+  },
+  {
+    path: '/projects',
+    label: '项目',
+    badge: null
+  }
+]);
+
+// 消息通知面板控制
+const toggleNotificationPanel = () => {
+  showNotifications.value = !showNotifications.value;
+};
+
+const hideNotificationPanel = () => {
+  showNotifications.value = false;
+};
+
+const updateUnreadCount = (count: number) => {
+  unreadNotificationCount.value = count;
+};
+
+// Tab导航相关方法
+const navigateToTab = (path: string) => {
+  router.push(path);
+};
+
+const getNavItemClass = (path: string) => {
+  const isActive = route.path === path;
+  return [
+    isActive
+      ? 'bg-primary text-primary-foreground'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+  ];
+};
+
+// 退出登录
+const logout = () => {
+  delToken();
+  userStore.resetInfo();
+  router.push('/login');
+};
+
+// 组件挂载时获取用户信息
+onMounted(async () => {
+  if (!user.id) {
+    await userStore.fetchInfo();
+  }
+});
+</script>
+
 <template>
   <div class="h-screen bg-background flex flex-col overflow-hidden">
     <!-- 顶部导航栏 -->
@@ -48,11 +131,11 @@
               :title="showNotifications ? '隐藏通知' : '显示通知'"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
               </svg>
               <span
                 v-if="unreadNotificationCount > 0"
-                class="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
+                class="absolute -top-1 -right-1 bg-yellow-500 text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
               >
                 {{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}
               </span>
@@ -218,89 +301,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useUserStore } from '@/stores/index';
-import { Button } from '@/components/ui/button';
-import { delToken } from '@/utils/token';
-import NotificationPanel from '@/components/ui/notification/NotificationPanel.vue';
-
-const router = useRouter();
-const route = useRoute();
-const userStore = useUserStore();
-
-// 响应式数据
-const { user } = userStore;
-const showNotifications = ref(false);
-const unreadNotificationCount = ref(0);
-
-// 导航项配置
-const navigationItems = computed(() => [
-  {
-    path: '/overview',
-    label: '概览',
-    badge: null
-  },
-  {
-    path: '/repositories',
-    label: '仓库',
-    badge: user.total_repos || 0
-  },
-  {
-    path: '/issues',
-    label: 'Issues',
-    badge: null
-  },
-  {
-    path: '/projects',
-    label: '项目',
-    badge: null
-  }
-]);
-
-// 消息通知面板控制
-const toggleNotificationPanel = () => {
-  showNotifications.value = !showNotifications.value;
-};
-
-const hideNotificationPanel = () => {
-  showNotifications.value = false;
-};
-
-const updateUnreadCount = (count: number) => {
-  unreadNotificationCount.value = count;
-};
-
-// Tab导航相关方法
-const navigateToTab = (path: string) => {
-  router.push(path);
-};
-
-const getNavItemClass = (path: string) => {
-  const isActive = route.path === path;
-  return [
-    isActive
-      ? 'bg-primary text-primary-foreground'
-      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-  ];
-};
-
-// 退出登录
-const logout = () => {
-  delToken();
-  userStore.resetInfo();
-  router.push('/login');
-};
-
-// 组件挂载时获取用户信息
-onMounted(async () => {
-  if (!user.id) {
-    await userStore.fetchInfo();
-  }
-});
-</script>
 
 <style scoped>
 /* 自定义滚动条样式 */

@@ -7,6 +7,7 @@ interface UserState {
   avatar_url?: string;
   bio?: string;
   email?: string;
+  login?: string;
   followers?: number;
   following?: number;
   html_url?: string;

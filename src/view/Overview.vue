@@ -1,3 +1,161 @@
+<script setup lang="ts">
+import { useUserStore } from '@/stores/index';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { $fetch } from '@/utils/fetch';
+import { onMounted, ref } from 'vue';
+
+// 定义活动数据接口
+interface Activity {
+  type: string;
+  actor: {
+    login: string;
+    id: string;
+    avatar_url: string;
+    html_url: string;
+  };
+  repo: {
+    id: number;
+    name: string;
+    path: string;
+    web_url: string;
+  };
+  created_at: string;
+  payload: string;
+}
+
+const userStore = useUserStore();
+const { user } = userStore;
+
+// 活动数据状态
+const recentActivity = ref<Activity[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+
+// 获取活动数据
+const fetchRecentActivity = async () => {
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const { success, data } = await $fetch(`/users/${user.login}/events`, { method: 'get' });
+    if (success && Array.isArray(data)) {
+      console.log('活动数据:', data);
+      recentActivity.value = data;
+    }
+  } catch (error) {
+    console.error('获取最近活动失败:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 获取活动类型的图标和颜色
+const getActivityIcon = (type: string) => {
+  const iconMap: Record<string, { icon: string; color: string }> = {
+    push: {
+      icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10',
+      color: 'text-green-500'
+    },
+    create: {
+      icon: 'M12 4v16m8-8H4',
+      color: 'text-blue-500'
+    },
+    delete: {
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+      color: 'text-red-500'
+    },
+    fork: {
+      icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l3-3m0 0l-3-3m3 3H9',
+      color: 'text-purple-500'
+    },
+    issues: {
+      icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z',
+      color: 'text-orange-500'
+    },
+    pull_request: {
+      icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 12l2 2 4-4',
+      color: 'text-indigo-500'
+    },
+    release: {
+      icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
+      color: 'text-yellow-500'
+    },
+    star: {
+      icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+      color: 'text-amber-500'
+    }
+  };
+
+  return iconMap[type] || iconMap.push;
+};
+
+// 格式化时间显示
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) {
+    return '刚刚';
+  } else if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes}分钟前`;
+  } else if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours}小时前`;
+  } else if (diffInSeconds < 2592000) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days}天前`;
+  } else {
+    return date.toLocaleDateString('zh-CN');
+  }
+};
+
+// 获取活动描述文本
+const getActivityDescription = (activity: Activity): string => {
+  const { type, repo, payload } = activity;
+
+  switch (type) {
+    case 'push':
+      return `推送了代码到 ${repo.name}`;
+    case 'create':
+      return `在 ${repo.name} 中创建了新内容`;
+    case 'delete':
+      return `在 ${repo.name} 中删除了内容`;
+    case 'fork':
+      return `Fork 了 ${repo.name}`;
+    case 'issues':
+      return `在 ${repo.name} 中处理了 Issue`;
+    case 'pull_request':
+      return `在 ${repo.name} 中提交了 Pull Request`;
+    case 'release':
+      return `为 ${repo.name} 发布了新版本`;
+    case 'star':
+      return `给 ${repo.name} 点了星标`;
+    default:
+      return payload || `在 ${repo.name} 中进行了操作`;
+  }
+};
+
+// 处理点击跳转
+const handleUserClick = (userUrl: string) => {
+  console.log('跳转到用户页面:', userUrl);
+  // 这里可以添加路由跳转逻辑
+};
+
+const handleRepoClick = (repoUrl: string) => {
+  console.log('跳转到仓库页面:', repoUrl);
+  // 这里可以添加路由跳转逻辑
+};
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchRecentActivity();
+});
+</script>
+
 <template>
   <div class="space-y-6">
     <!-- 欢迎标题 -->
@@ -82,34 +240,111 @@
           <CardDescription>您最近的代码活动记录</CardDescription>
         </CardHeader>
         <CardContent>
-          <div class="space-y-4">
-            <div class="flex items-start space-x-3">
-              <div class="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-              <div class="flex-1">
-                <p class="text-sm font-medium text-foreground">完成了 Issue #123</p>
-                <p class="text-xs text-muted-foreground">修复登录问题 • 2小时前</p>
+          <!-- 加载状态 -->
+          <div v-if="loading" class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span class="ml-2 text-sm text-muted-foreground">加载活动数据...</span>
+          </div>
+
+          <!-- 错误状态 -->
+          <div v-else-if="error" class="text-center py-8">
+            <div class="text-muted-foreground mb-2">
+              <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+              </svg>
+              <p class="text-sm">加载活动数据失败</p>
+            </div>
+            <Button variant="outline" size="sm" @click="fetchRecentActivity">
+              重试
+            </Button>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else-if="recentActivity.length === 0" class="text-center py-8">
+            <div class="text-muted-foreground">
+              <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              <p class="text-sm">暂无活动记录</p>
+            </div>
+          </div>
+
+          <!-- 活动列表 -->
+          <div v-else class="space-y-4">
+            <div
+              v-for="activity in recentActivity.slice(0, 5)"
+              :key="`${activity.type}-${activity.created_at}-${activity.repo.id}`"
+              class="flex items-start space-x-3 group hover:bg-muted/50 rounded-lg p-2 -m-2 transition-colors cursor-pointer"
+              @click="handleRepoClick(activity.repo.web_url)"
+            >
+              <!-- 用户头像 -->
+              <Avatar size="sm" class="flex-shrink-0">
+                <AvatarImage
+                  :src="activity.actor.avatar_url"
+                  :alt="activity.actor.login"
+                />
+                <AvatarFallback class="text-xs">
+                  {{ activity.actor.login.charAt(0).toUpperCase() }}
+                </AvatarFallback>
+              </Avatar>
+
+              <!-- 活动图标 -->
+              <div class="flex-shrink-0 mt-1">
+                <div :class="['w-6 h-6 rounded-full flex items-center justify-center', getActivityIcon(activity.type).color.replace('text-', 'bg-').replace('-500', '-100')]">
+                  <svg
+                    :class="['w-3 h-3', getActivityIcon(activity.type).color]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      :d="getActivityIcon(activity.type).icon"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <!-- 活动内容 -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                      <button
+                        @click.stop="handleUserClick(activity.actor.html_url)"
+                        class="hover:underline font-semibold"
+                      >
+                        {{ activity.actor.login }}
+                      </button>
+                      {{ getActivityDescription(activity) }}
+                    </p>
+                    <div class="flex items-center space-x-2 mt-1">
+                      <button
+                        @click.stop="handleRepoClick(activity.repo.web_url)"
+                        class="text-xs text-muted-foreground hover:text-primary transition-colors hover:underline"
+                      >
+                        {{ activity.repo.path }}
+                      </button>
+                      <span class="text-xs text-muted-foreground">•</span>
+                      <span class="text-xs text-muted-foreground">
+                        {{ formatTimeAgo(activity.created_at) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="flex items-start space-x-3">
-              <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-              <div class="flex-1">
-                <p class="text-sm font-medium text-foreground">创建了新分支</p>
-                <p class="text-xs text-muted-foreground">feature/user-profile • 4小时前</p>
-              </div>
-            </div>
-            <div class="flex items-start space-x-3">
-              <div class="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
-              <div class="flex-1">
-                <p class="text-sm font-medium text-foreground">推送了 3 个提交</p>
-                <p class="text-xs text-muted-foreground">到 main 分支 • 1天前</p>
-              </div>
-            </div>
-            <div class="flex items-start space-x-3">
-              <div class="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
-              <div class="flex-1">
-                <p class="text-sm font-medium text-foreground">更新了项目文档</p>
-                <p class="text-xs text-muted-foreground">README.md • 2天前</p>
-              </div>
+
+            <!-- 查看更多按钮 -->
+            <div v-if="recentActivity.length > 5" class="text-center mt-4 border-t border-border">
+              <Button variant="ghost" size="sm" class="text-muted-foreground hover:text-foreground mt-2">
+                查看全部活动
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -154,12 +389,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { useUserStore } from '@/stores/index';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-
-const userStore = useUserStore();
-const { user } = userStore;
-</script>
