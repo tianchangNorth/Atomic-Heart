@@ -120,14 +120,16 @@ const getActivityDescription = (activity: Activity): string => {
   switch (type) {
     case 'push':
       return `推送了代码到 ${repo.name}`;
-    case 'create':
-      return `在 ${repo.name} 中创建了新内容`;
+    case 'mirror_sync':
+      return `同步更新了 ${repo.name}`;
+    case 'create_repo':
+      return `新建了代码库 ${repo.name} `;
     case 'delete':
       return `在 ${repo.name} 中删除了内容`;
     case 'fork':
       return `Fork 了 ${repo.name}`;
-    case 'issues':
-      return `在 ${repo.name} 中处理了 Issue`;
+    case 'create_issue':
+      return `在 ${repo.name} 中创建了 Issue`;
     case 'pull_request':
       return `在 ${repo.name} 中提交了 Pull Request`;
     case 'release':
@@ -161,7 +163,7 @@ onMounted(() => {
     <!-- 欢迎标题 -->
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-foreground mb-2">欢迎回来，{{ user.name || '用户' }}！</h1>
-      <p class="text-muted-foreground">这是您的 AtomGit 工作台概览</p>
+      <p class="text-muted-foreground">AtomGit 工作台</p>
     </div>
 
     <!-- 统计卡片 -->
@@ -218,7 +220,7 @@ onMounted(() => {
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-muted-foreground">活跃 Issues</p>
+              <p class="text-sm font-medium text-muted-foreground">未处理任务</p>
               <p class="text-2xl font-bold text-foreground">12</p>
             </div>
             <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
@@ -335,16 +337,6 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-            </div>
-
-            <!-- 查看更多按钮 -->
-            <div v-if="recentActivity.length > 5" class="text-center mt-4 border-t border-border">
-              <Button variant="ghost" size="sm" class="text-muted-foreground hover:text-foreground mt-2">
-                查看全部活动
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </Button>
             </div>
           </div>
         </CardContent>

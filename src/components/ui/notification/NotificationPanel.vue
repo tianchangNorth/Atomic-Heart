@@ -251,7 +251,7 @@ const getNotificationIconClass = (type: string) => {
 
 const getNotificationBadgeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
   const variants = {
-    issue: 'destructive' as const,
+    issue: 'default' as const,
     pr: 'default' as const,
     mention: 'secondary' as const,
     system: 'outline' as const
