@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/index';
 import { Button } from '@/components/ui/button';
 import { delToken } from '@/utils/token';
 import NotificationPanel from '@/components/ui/notification/NotificationPanel.vue';
+import { initializeNotifications, unreadCount } from '@/services/notificationService';
 
 const router = useRouter();
 const route = useRoute();
@@ -13,7 +14,6 @@ const userStore = useUserStore();
 // 响应式数据
 const { user } = userStore;
 const showNotifications = ref(false);
-const unreadNotificationCount = ref(0);
 
 // 导航项配置
 const navigationItems = computed(() => [
@@ -48,9 +48,10 @@ const hideNotificationPanel = () => {
   showNotifications.value = false;
 };
 
-const updateUnreadCount = (count: number) => {
-  unreadNotificationCount.value = count;
-};
+// 通知服务已经提供了 unreadCount，不需要本地状态
+// const updateUnreadCount = (count: number) => {
+//   // 不再需要，直接使用服务中的 unreadCount
+// };
 
 // Tab导航相关方法
 const navigateToTab = (path: string) => {
@@ -78,6 +79,8 @@ onMounted(async () => {
   if (!user.id) {
     await userStore.fetchInfo();
   }
+  // 初始化通知服务
+  initializeNotifications();
 });
 </script>
 
@@ -134,10 +137,10 @@ onMounted(async () => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
               </svg>
               <span
-                v-if="unreadNotificationCount > 0"
+                v-if="unreadCount > 0"
                 class="absolute -top-1 -right-1 bg-yellow-500 text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium"
               >
-                {{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}
+                {{ unreadCount > 99 ? '99+' : unreadCount }}
               </span>
             </button>
 
@@ -270,7 +273,7 @@ onMounted(async () => {
       </aside>
 
       <!-- 主内容区域 -->
-      <main class="flex-1 flex overflow-hidden" :class="showNotifications ? 'mr-4' : ''">
+      <main class="flex-1 flex overflow-hidden">
         <!-- 内容容器 -->
         <div class="flex-1 bg-card rounded-lg border border-border overflow-hidden flex flex-col m-6">
           <!-- 路由视图容器 -->
@@ -291,10 +294,9 @@ onMounted(async () => {
         leave-from-class="transform translate-x-0 opacity-100"
         leave-to-class="transform translate-x-full opacity-0"
       >
-        <div v-if="showNotifications" class="flex-shrink-0 w-80 mt-6">
+        <div v-show="showNotifications" class="flex-shrink-0 w-80 mt-6 mr-6">
           <NotificationPanel
             @close="hideNotificationPanel"
-            @unread-count-change="updateUnreadCount"
           />
         </div>
       </Transition>

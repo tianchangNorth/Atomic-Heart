@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+import { provide, ref } from 'vue'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 const avatarVariants = cva(
@@ -31,5 +32,16 @@ export interface AvatarProps {
 
 const props = withDefaults(defineProps<AvatarProps>(), {
   size: 'default'
+})
+
+// Avatar 上下文，用于协调 AvatarImage 和 AvatarFallback 的显示
+const imageLoaded = ref(false)
+const imageError = ref(false)
+
+provide('avatarContext', {
+  imageLoaded,
+  imageError,
+  setImageLoaded: (loaded: boolean) => { imageLoaded.value = loaded },
+  setImageError: (error: boolean) => { imageError.value = error }
 })
 </script>

@@ -1,45 +1,22 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { $fetch } from '@/utils/fetch';
+// computed 不再需要，因为使用服务中的
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-// 新的通知数据结构
-interface Notification {
-  id: string;                    // 通知唯一标识
-  content: string;               // 通知内容（包含HTML）
-  unread: boolean;               // 是否未读
-  updated_at: string;            // 更新时间
-  url: string;                   // API地址
-  html_url: string;              // 网页地址
-  sender: {                      // 发送者信息
-    login: string;               // 用户名
-    id: string;                  // 用户ID
-    avatar_url: string;          // 头像URL
-    html_url: string;            // 用户主页
-  };
-}
-
-// 定义事件
-const emit = defineEmits<{
-  close: [];
-  'unread-count-change': [count: number];
-}>();
-
-const notifications = ref<Notification[]>([]);
-const hasMore = ref(false);
-const loading = ref(false);
-
-const unreadCount = computed(() => {
-  return notifications.value.filter(n => n.unread).length;
-});
-
-// 监听未读数量变化，通知父组件
-watch(unreadCount, (newCount) => {
-  emit('unread-count-change', newCount);
-}, { immediate: true });
+import { invoke } from '@tauri-apps/api/core'
+import {
+  notifications,
+  loading,
+  hasMore,
+  unreadCount,
+  markAsRead,
+  markAllAsRead,
+  dismissNotification,
+  clearAllNotifications,
+  refreshNotifications,
+  type Notification
+} from '@/services/notificationService';
 
 // 从通知内容中提取通知类型
 const getNotificationType = (content: string): string => {
@@ -54,18 +31,6 @@ const getNotificationType = (content: string): string => {
     return 'activity';
   }
   return 'system';
-};
-
-const getNotificationIconClass = (content: string) => {
-  const type = getNotificationType(content);
-  const classes = {
-    issue: 'bg-destructive/10 text-destructive',
-    pr: 'bg-green-500/10 text-green-600',
-    mention: 'bg-blue-500/10 text-blue-600',
-    activity: 'bg-purple-500/10 text-purple-600',
-    system: 'bg-muted text-muted-foreground'
-  };
-  return classes[type as keyof typeof classes] || classes.system;
 };
 
 const getNotificationBadgeVariant = (content: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -124,93 +89,13 @@ const sanitizeHtml = (html: string): string => {
     .replace(/javascript:/gi, '');
 };
 
-const fetchNotifications = async () => {
-  try {
-    loading.value = true;
-    const { success, data } = await $fetch('/notifications/messages', {
-      method: 'get',
-      data: {
-        per_page: 10
-      }
-    });
-    if (success) {
-      notifications.value = data.list || [];
-      console.log('获取通知成功:', data);
-      hasMore.value = data.hasMore || false;
-    } else {
-      // API 失败时使用模拟数据
-    }
-  } catch (error) {
-    console.error('获取通知失败:', error);
-    // 使用模拟数据作为降级方案
-  } finally {
-    loading.value = false;
-  }
-};
+// fetchNotifications 现在在服务中
 
-const markAsRead = async (notificationId: string) => {
-  try {
-    await $fetch(`/notifications/${notificationId}/read`, { method: 'post' });
-    const notification = notifications.value.find(n => n.id === notificationId);
-    if (notification) {
-      notification.unread = false;
-    }
-  } catch (error) {
-    console.error('标记已读失败:', error);
-    // 本地更新用于演示
-    const notification = notifications.value.find(n => n.id === notificationId);
-    if (notification) {
-      notification.unread = false;
-    }
-  }
-};
-
-const markAllAsRead = async () => {
-  try {
-    await $fetch('/notifications/read-all', { method: 'post' });
-    notifications.value.forEach(n => n.unread = false);
-  } catch (error) {
-    console.error('全部标记已读失败:', error);
-    // 本地更新用于演示
-    notifications.value.forEach(n => n.unread = false);
-  }
-};
-
-const dismissNotification = async (notificationId: string) => {
-  try {
-    await $fetch(`/notifications/${notificationId}`, { method: 'post' });
-    const index = notifications.value.findIndex(n => n.id === notificationId);
-    if (index > -1) {
-      notifications.value.splice(index, 1);
-    }
-  } catch (error) {
-    console.error('删除通知失败:', error);
-    // 本地删除用于演示
-    const index = notifications.value.findIndex(n => n.id === notificationId);
-    if (index > -1) {
-      notifications.value.splice(index, 1);
-    }
-  }
-};
-
-const clearAllNotifications = async () => {
-  try {
-    await $fetch('/notifications/clear-all', { method: 'post' });
-    notifications.value = [];
-  } catch (error) {
-    console.error('清空通知失败:', error);
-    // 本地清空用于演示
-    notifications.value = [];
-  }
-};
+// 所有函数现在都在服务中，直接使用导入的函数
 
 const loadMore = async () => {
   // 实现加载更多逻辑
   console.log('加载更多通知');
-};
-
-const refreshNotifications = () => {
-  fetchNotifications();
 };
 
 const handleNotificationClick = (notification: Notification) => {
@@ -227,13 +112,18 @@ const handleNotificationClick = (notification: Notification) => {
   }
 };
 
-onMounted(() => {
-  fetchNotifications();
-});
+const openUrl = async (url: string) => {
+  try {
+    await invoke('open_url', { url });
+  } catch (error) {
+    console.error('打开链接失败:', error);
+  }
+};
+
 </script>
 
 <template>
-  <Card class="w-80 h-[600px] flex flex-col overflow-hidden shadow-lg">
+  <Card class="w-80 h-[886px] flex flex-col overflow-hidden shadow-lg">
     <!-- 通知头部 -->
     <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
@@ -339,14 +229,13 @@ onMounted(() => {
                     >
                       {{ getNotificationTypeText(notification.content) }}
                     </Badge>
-                    <a
+                    <div
                       v-if="notification.html_url"
-                      :href="notification.html_url"
                       class="text-xs text-muted-foreground hover:text-primary transition-colors"
-                      @click.stop
+                      @click.stop="openUrl(notification.html_url)"
                     >
                       查看详情
-                    </a>
+                  </div>
                   </div>
 
                   <!-- 操作按钮 -->
