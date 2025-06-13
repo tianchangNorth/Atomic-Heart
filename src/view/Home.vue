@@ -48,11 +48,6 @@ const hideNotificationPanel = () => {
   showNotifications.value = false;
 };
 
-// 通知服务已经提供了 unreadCount，不需要本地状态
-// const updateUnreadCount = (count: number) => {
-//   // 不再需要，直接使用服务中的 unreadCount
-// };
-
 // Tab导航相关方法
 const navigateToTab = (path: string) => {
   router.push(path);

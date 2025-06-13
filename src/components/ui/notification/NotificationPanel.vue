@@ -123,14 +123,17 @@ const openUrl = async (url: string) => {
 </script>
 
 <template>
-  <Card class="w-80 h-[886px] flex flex-col overflow-hidden shadow-lg">
+  <Card class="w-80 h-[880px] flex flex-col overflow-hidden shadow-lg">
     <!-- 通知头部 -->
     <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+            <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <g transform="translate(2, 2)">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+              </g>
             </svg>
           </div>
           <div>

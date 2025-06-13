@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { $fetch } from '@/utils/fetch';
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router'
+import { invoke } from '@tauri-apps/api/core'
 
 // 定义活动数据接口
 interface Activity {
@@ -27,6 +29,7 @@ interface Activity {
 
 const userStore = useUserStore();
 const { user } = userStore;
+const router = useRouter();
 
 // 活动数据状态
 const recentActivity = ref<Activity[]>([]);
@@ -41,7 +44,6 @@ const fetchRecentActivity = async () => {
   try {
     const { success, data } = await $fetch(`/users/${user.login}/events`, { method: 'get' });
     if (success && Array.isArray(data)) {
-      console.log('活动数据:', data);
       recentActivity.value = data;
     }
   } catch (error) {
@@ -143,13 +145,11 @@ const getActivityDescription = (activity: Activity): string => {
 
 // 处理点击跳转
 const handleUserClick = (userUrl: string) => {
-  console.log('跳转到用户页面:', userUrl);
-  // 这里可以添加路由跳转逻辑
+  invoke('open_url', { url: userUrl });
 };
 
 const handleRepoClick = (repoUrl: string) => {
-  console.log('跳转到仓库页面:', repoUrl);
-  // 这里可以添加路由跳转逻辑
+  invoke('open_url', { url: repoUrl });
 };
 
 // 组件挂载时获取数据
@@ -169,8 +169,8 @@ onMounted(() => {
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <Card>
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between">
+        <CardContent class="p-6 cursor-pointer" @click="() => { router.push('/repositories') }">
+          <div class="flex items-center justify-between" >
             <div>
               <p class="text-sm font-medium text-muted-foreground">总仓库数</p>
               <p class="text-2xl font-bold text-foreground">{{ user.total_repos || 0 }}</p>
