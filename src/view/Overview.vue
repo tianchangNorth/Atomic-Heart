@@ -286,7 +286,7 @@ onMounted(() => {
                   :alt="activity.actor.login"
                 />
                 <AvatarFallback class="text-xs">
-                  {{ activity.actor.login.charAt(0).toUpperCase() }}
+                  {{ activity.actor.login?.charAt(0)?.toUpperCase() || 'U' }}
                 </AvatarFallback>
               </Avatar>
 

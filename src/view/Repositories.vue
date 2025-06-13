@@ -61,6 +61,7 @@ const fetchRepositories = async () => {
 // 筛选和排序的仓库列表
 const filteredRepositories = computed(() => {
   let filtered = repositories.value;
+  console.log(searchQuery.value);
 
   // 搜索筛选
   if (searchQuery.value) {
@@ -172,6 +173,8 @@ const handleCreateRepo = () => {
 
 // 搜索处理函数
 const handleSearch = () => {
+  console.log('searchInput:', searchInput.value);
+
   searchQuery.value = searchInput.value.trim();
 };
 
