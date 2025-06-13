@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { $fetch } from '@/utils/fetch';
+import { invoke } from '@tauri-apps/api/core'
 
 // Issue 数据结构定义
 interface Issue {
@@ -181,7 +182,7 @@ const getRepositoryName = (repositoryUrl: string): string => {
 const handleIssueClick = (issue: Issue) => {
   console.log('查看 Issue:', issue.html_url);
   // 这里可以添加路由跳转逻辑
-  // router.push(issue.html_url);
+  invoke('open_url', { url: issue.html_url });
 };
 
 const handleCreateIssue = () => {
@@ -209,7 +210,7 @@ watch(activeTab, async (newTab) => {
   }
 }, { immediate: false });
 
-function extractPlainTextFromHtml(html: string): string {
+const extractPlainTextFromHtml = (html: string): string => {
   const div = document.createElement('div');
   div.innerHTML = html;
   return div.textContent?.trim() || '';
@@ -218,6 +219,7 @@ function extractPlainTextFromHtml(html: string): string {
 // 组件挂载时获取数据
 onMounted(() => {
   getAssignedIssues();
+  getCreatedIssues();
 });
 </script>
 
@@ -589,9 +591,9 @@ onMounted(() => {
                       </div>
 
                       <!-- 描述 -->
-                      <p class="text-muted-foreground mb-4 line-clamp-2">
-                        {{ issue.body || '暂无描述' }}
-                      </p>
+                  <p class="text-muted-foreground mb-4 line-clamp-2">
+                    {{ extractPlainTextFromHtml(issue.body) || '暂无描述' }}
+                  </p>
 
                       <!-- 元信息 -->
                       <div class="flex items-center flex-wrap gap-4 text-sm text-muted-foreground">

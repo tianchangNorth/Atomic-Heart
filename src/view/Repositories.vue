@@ -61,8 +61,6 @@ const fetchRepositories = async () => {
 // 筛选和排序的仓库列表
 const filteredRepositories = computed(() => {
   let filtered = repositories.value;
-  console.log(searchQuery.value);
-
   // 搜索筛选
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
@@ -171,19 +169,6 @@ const handleCreateRepo = () => {
   // router.push('/repos/new');
 };
 
-// 搜索处理函数
-const handleSearch = () => {
-  console.log('searchInput:', searchInput.value);
-
-  searchQuery.value = searchInput.value.trim();
-};
-
-const handleSearchKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Enter') {
-    handleSearch();
-  }
-};
-
 const clearSearch = () => {
   searchInput.value = '';
   searchQuery.value = '';
@@ -244,11 +229,10 @@ onMounted(() => {
       <div class="flex-1">
         <div class="relative">
           <Input
-            v-model="searchInput"
+            v-model="searchQuery"
             type="text"
-            placeholder="搜索仓库名称、描述...（按回车搜索）"
+            placeholder="搜索仓库名称、描述.."
             class="pl-10 pr-20"
-            @keydown="handleSearchKeydown"
           />
           <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -257,7 +241,7 @@ onMounted(() => {
           <!-- 搜索和清除按钮 -->
           <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
             <Button
-              v-if="searchInput"
+              v-if="searchQuery"
               variant="ghost"
               size="sm"
               @click="clearSearch"
@@ -266,17 +250,6 @@ onMounted(() => {
             >
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="handleSearch"
-              class="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
-              title="搜索"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
               </svg>
             </Button>
           </div>
