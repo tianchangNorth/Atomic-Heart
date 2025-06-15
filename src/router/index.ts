@@ -7,6 +7,7 @@ import Home from '@/view/Home.vue'
 import Overview from '@/view/Overview.vue'
 import Issues from '@/view/Issues.vue'
 import Repositories from '@/view/Repositories.vue'
+import RepositoryDetail from '@/view/RepositoryDetail.vue'
 import Projects from '@/view/Projects.vue'
 
 const routes = [
@@ -20,6 +21,12 @@ const routes = [
       { path: '/repositories', component: Repositories, name: 'Repositories' },
       { path: '/projects', component: Projects, name: 'Projects' },
     ]
+  },
+  {
+    path: '/repository/:owner/:repo',
+    component: RepositoryDetail,
+    name: 'RepositoryDetail',
+    props: true
   },
   { path: '/login', component: Login },
 ]

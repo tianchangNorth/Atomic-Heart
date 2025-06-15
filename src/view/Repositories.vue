@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ interface Repository {
   forks_count?: number;   // 分叉数
 }
 
+const router = useRouter();
 const userStore = useUserStore();
 const { user } = userStore;
 
@@ -157,9 +159,13 @@ const handleCloneRepo = (repo: Repository) => {
 
 const handleViewRepo = (repo: Repository) => {
   // 跳转到仓库详情页面
-  console.log('查看仓库:', repo.html_url);
-  // 这里可以添加路由跳转逻辑
-  // router.push(repo.html_url);
+  const [owner, repoName] = repo.full_name.split('/');
+  console.log(owner, repoName);
+
+  router.push({
+    name: 'RepositoryDetail',
+    params: { owner, repo: repoName }
+  });
 };
 
 const handleCreateRepo = () => {
@@ -215,12 +221,14 @@ onMounted(() => {
         <h1 class="text-3xl font-bold text-foreground">仓库</h1>
         <p class="text-muted-foreground">管理您的代码仓库</p>
       </div>
-      <Button @click="handleCreateRepo" class="self-start sm:self-auto">
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        新建仓库
-      </Button>
+      <div class="flex gap-2">
+        <Button @click="handleCreateRepo" class="self-start sm:self-auto">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          新建仓库
+        </Button>
+      </div>
     </div>
 
     <!-- 搜索、筛选和排序 -->
