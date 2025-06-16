@@ -1,27 +1,46 @@
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { open } from '@tauri-apps/plugin-dialog';
 import { gitApi, gitCloneManager } from '@/services/git-api';
-import { CloneOptionsBuilder, AuthConfigBuilder, formatBytes, formatDuration, extractRepoNameFromUrl } from '@/types/git-backend';
+import { CloneOptionsBuilder, AuthConfigBuilder, formatBytes, formatDuration } from '@/types/git-backend';
 import type { CloneProgress, AuthType, CloneResult, AuthConfig } from '@/types/git-backend';
+
+// Props 定义
+interface Props {
+  initialUrl?: string;
+  initialDirectory?: string;
+  initialAuthConfig?: AuthConfig;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  initialUrl: '',
+  initialDirectory: '',
+  initialAuthConfig: undefined
+});
+
+// Emits 定义
+const emit = defineEmits<{
+  cloneSuccess: [result: CloneResult];
+  cloneError: [error: Error];
+}>();
 
 // 组件状态
 const cloneForm = reactive({
-  url: '',
-  directory: '',
+  url: props.initialUrl || '',
+  directory: props.initialDirectory || '',
   branch: '',
   depth: undefined as number | undefined,
   recursive: false,
-  authType: 'none' as AuthType,
-  username: '',
-  password: '',
-  token: '',
-  sshKeyPath: '',
-  sshKeyPassphrase: ''
+  authType: (props.initialAuthConfig?.auth_type || 'none') as AuthType,
+  username: props.initialAuthConfig?.username || '',
+  password: props.initialAuthConfig?.password || '',
+  token: props.initialAuthConfig?.token || '',
+  sshKeyPath: props.initialAuthConfig?.ssh_key_path || '',
+  sshKeyPassphrase: props.initialAuthConfig?.ssh_key_passphrase || ''
 });
 
 const showAdvanced = ref(false);
@@ -55,12 +74,6 @@ const authTypeOptions = [
   { value: 'token', label: 'Personal Access Token' },
   { value: 'ssh', label: 'SSH 密钥' }
 ];
-
-const suggestedDirectory = computed(() => {
-  if (!cloneForm.url) return '';
-  const repoName = extractRepoNameFromUrl(cloneForm.url);
-  return `./projects/${repoName}`;
-});
 
 // 克隆阶段图标和描述
 const getStageIcon = (stage: string) => {
@@ -111,6 +124,32 @@ const formatNetworkSpeed = (bytesPerSecond: number): string => {
   return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
 };
 
+// 监听 props 变化
+watch(() => props.initialUrl, (newUrl) => {
+  if (newUrl && newUrl !== cloneForm.url) {
+    cloneForm.url = newUrl;
+    detectAuthType();
+  }
+}, { immediate: true });
+
+watch(() => props.initialDirectory, (newDirectory) => {
+  if (newDirectory && newDirectory !== cloneForm.directory) {
+    cloneForm.directory = newDirectory;
+  }
+}, { immediate: true });
+
+watch(() => props.initialAuthConfig, (newAuthConfig) => {
+  console.log('initialAuthConfig 变化:', newAuthConfig);
+  if (newAuthConfig) {
+    cloneForm.authType = newAuthConfig.auth_type;
+    cloneForm.username = newAuthConfig.username || '';
+    cloneForm.password = newAuthConfig.password || '';
+    cloneForm.token = newAuthConfig.token || '';
+    cloneForm.sshKeyPath = newAuthConfig.ssh_key_path || '';
+    cloneForm.sshKeyPassphrase = newAuthConfig.ssh_key_passphrase || '';
+  }
+}, { immediate: true });
+
 // 生命周期
 onMounted(async () => {
   // 加载默认 SSH 密钥
@@ -146,10 +185,6 @@ const validateUrl = async () => {
       urlError.value = '请输入有效的 Git 仓库地址';
     } else {
       urlError.value = '';
-      // 自动填充目录名
-      if (!cloneForm.directory) {
-        cloneForm.directory = suggestedDirectory.value;
-      }
       // 检测认证类型
       await detectAuthType();
     }
@@ -162,6 +197,12 @@ const detectAuthType = async () => {
   if (!cloneForm.url) return;
 
   try {
+    // 如果已经通过 props 设置了认证配置，不要覆盖它
+    if (props.initialAuthConfig) {
+      console.log('跳过自动检测，使用 props 中的认证配置');
+      return;
+    }
+
     const authType = await gitApi.detectAuthType(cloneForm.url);
     cloneForm.authType = authType as AuthType;
 
@@ -351,6 +392,11 @@ const startClone = async () => {
         if (authConfig && result.success) {
           gitApi.storeCredentials(cloneForm.url, authConfig).catch(console.error);
         }
+
+        // 发出克隆成功事件
+        if (result.success) {
+          emit('cloneSuccess', result);
+        }
       },
       (error) => {
         console.error('克隆失败:', error);
@@ -361,6 +407,9 @@ const startClone = async () => {
           progress: 0,
           message: `克隆失败: ${error.message}`,
         };
+
+        // 发出克隆错误事件
+        emit('cloneError', error);
       }
     );
   } catch (error) {

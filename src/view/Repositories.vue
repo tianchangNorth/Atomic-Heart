@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { $fetch } from '@/utils/fetch';
 import { useUserStore } from '@/stores/index';
+import RepoClone from '@/components/git/RepoClone.vue';
+import { getToken } from '@/utils/token';
 
 // 定义仓库数据接口
 interface Repository {
@@ -38,6 +40,10 @@ const searchQuery = ref('');
 const searchInput = ref(''); // 输入框的值
 const sortBy = ref('name');
 const filterBy = ref('all');
+
+// 克隆相关状态
+const showCloneDialog = ref(false);
+const selectedRepoForClone = ref<Repository | null>(null);
 
 // 获取仓库数据
 const fetchRepositories = async () => {
@@ -148,13 +154,40 @@ const getLanguageColor = (language?: string): string => {
 
 // 处理操作
 const handleCloneRepo = (repo: Repository) => {
-  // 复制 Git URL 到剪贴板
-  navigator.clipboard.writeText(repo.git_url).then(() => {
-    console.log('Git URL 已复制到剪贴板:', repo.git_url);
-    // 这里可以添加 toast 提示
-  }).catch(err => {
-    console.error('复制失败:', err);
+  console.log('handleCloneRepo 被调用:', {
+    repoName: repo.full_name,
+    gitUrl: repo.git_url,
+    token: getToken(),
+    userLogin: user.login
   });
+
+  selectedRepoForClone.value = repo;
+  showCloneDialog.value = true;
+};
+
+// 获取克隆配置
+const getCloneConfig = computed(() => {
+  if (!selectedRepoForClone.value) return null;
+
+  const repo = selectedRepoForClone.value;
+  const token = getToken();
+
+  return {
+    url: repo.html_url, // 确保使用 HTTPS URL 进行 token 认证
+    suggestedDirectory: '', // 不提供默认路径，让用户自己选择
+    // 如果用户已登录且有 token，提供默认的 token 认证配置
+    authConfig: token && user.login ? {
+      auth_type: 'token' as const,
+      token: token,
+      username: user.login
+    } : undefined
+  };
+});
+
+// 关闭克隆对话框
+const closeCloneDialog = () => {
+  showCloneDialog.value = false;
+  selectedRepoForClone.value = null;
 };
 
 const handleViewRepo = (repo: Repository) => {
@@ -434,7 +467,7 @@ onMounted(() => {
                 variant="outline"
                 size="sm"
                 @click.stop="handleCloneRepo(repo)"
-                title="复制克隆地址"
+                title="克隆仓库到本地"
               >
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -455,6 +488,44 @@ onMounted(() => {
           </div>
         </CardContent>
       </Card>
+    </div>
+
+    <!-- 克隆对话框 -->
+    <!-- <div
+      v-if="showCloneDialog"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click="closeCloneDialog"
+    >
+      <RepoClone
+        v-if="selectedRepoForClone && getCloneConfig"
+        :initial-url="getCloneConfig.url"
+        :initial-directory="getCloneConfig.suggestedDirectory"
+        :initial-auth-config="getCloneConfig.authConfig"
+        @clone-success="closeCloneDialog"
+      />
+    </div> -->
+
+    <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
+        <div class="relative">
+          <Button
+            variant="ghost"
+            class="absolute top-4 right-32 z-10 cursor-pointer"
+            @click="closeCloneDialog"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </Button>
+          <RepoClone
+            v-if="selectedRepoForClone && getCloneConfig"
+            :initial-url="getCloneConfig.url"
+            :initial-directory="getCloneConfig.suggestedDirectory"
+            :initial-auth-config="getCloneConfig.authConfig"
+            @clone-success="closeCloneDialog"
+          />
+        </div>
+      </div>
     </div>
 
   </div>
