@@ -485,7 +485,7 @@ const resetForm = () => {
         <!-- 认证类型选择 -->
         <div class="space-y-2">
           <label class="text-sm font-medium">认证方式</label>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2 mt-2">
             <Badge
               v-for="option in authTypeOptions"
               :key="option.value"
