@@ -3,15 +3,16 @@
 export interface GitCommit {
   sha: string;
   url: string;
-  html_url: string;
+  html_url?: string;
   message: string;
   author: GitUser;
   committer: GitUser;
-  tree: {
+  date?: string;
+  tree?: {
     sha: string;
     url: string;
   };
-  parents: Array<{
+  parents?: Array<{
     sha: string;
     url: string;
     html_url: string;
@@ -105,8 +106,81 @@ export interface CloneOptions {
   url: string;
   directory?: string;
   branch?: string;
-  depth?: number;
+  depth?: string | number;
   recursive?: boolean;
+  auth?: {
+    type: 'password' | 'ssh' | 'token';
+    username?: string;
+    password?: string;
+    token?: string;
+    sshKeyPath?: string;
+  };
+}
+
+// 本地仓库管理相关类型
+export interface LocalRepository {
+  id: string;
+  name: string;
+  path: string;
+  remoteUrl?: string;
+  currentBranch: string;
+  status: 'clean' | 'dirty' | 'conflict' | 'syncing';
+  lastCommit?: GitCommit;
+  ahead: number;
+  behind: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FileChange {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
+  staged: boolean;
+  oldPath?: string;
+  additions: number;
+  deletions: number;
+  content?: string;
+  diff?: string;
+}
+
+export interface CommitInfo {
+  message: string;
+  description?: string;
+  author?: {
+    name: string;
+    email: string;
+  };
+  amend?: boolean;
+  signoff?: boolean;
+}
+
+export interface SyncStatus {
+  ahead: number;
+  behind: number;
+  conflicts: string[];
+  lastSync?: string;
+  remoteStatus: 'connected' | 'disconnected' | 'error';
+}
+
+export interface BranchInfo {
+  name: string;
+  type: 'local' | 'remote';
+  current: boolean;
+  upstream?: string;
+  lastCommit: GitCommit;
+  ahead: number;
+  behind: number;
+}
+
+export interface OperationProgress {
+  id: string;
+  type: 'clone' | 'push' | 'pull' | 'commit' | 'merge';
+  status: 'pending' | 'running' | 'success' | 'error';
+  progress: number;
+  message: string;
+  startTime: string;
+  endTime?: string;
+  error?: string;
 }
 
 export interface PullOptions {
@@ -177,7 +251,7 @@ export interface GitStatusFile {
   from?: string; // for renamed files
 }
 
-export type GitFileStatus = 
+export type GitFileStatus =
   | ' '  // unmodified
   | 'M'  // modified
   | 'A'  // added
@@ -264,4 +338,16 @@ export interface GitDiffLine {
   content: string;
   oldLineNumber?: number;
   newLineNumber?: number;
+}
+
+export interface ConflictFile {
+  path: string;
+  resolved: boolean;
+  conflicts: Array<{
+    id: string;
+    startLine: number;
+    endLine: number;
+    currentContent: string;
+    incomingContent: string;
+  }>;
 }

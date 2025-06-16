@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 export interface InputProps {
   class?: string
-  modelValue?: string // 👈 重要：接收 v-model 传入的值
+  modelValue?: string | number // 👈 支持字符串和数字类型
 }
 
 const props = withDefaults(defineProps<InputProps>(), {})
