@@ -25,8 +25,8 @@ export interface Repository {
   watchers_count: number;
   forks_count: number;
   open_issues_count: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   pushed_at?: string;
   archived: boolean;
   disabled: boolean;

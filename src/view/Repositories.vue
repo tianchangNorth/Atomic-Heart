@@ -22,7 +22,7 @@ interface Repository {
   created_at?: string;    // 创建时间
   updated_at?: string;    // 更新时间
   language?: string;      // 主要编程语言
-  stars_count?: number;   // 星标数
+  stargazersCount?: number;   // 星标数
   forks_count?: number;   // 分叉数
 }
 
@@ -97,7 +97,7 @@ const filteredRepositories = computed(() => {
       case 'created':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       case 'stars':
-        return (b.stars_count || 0) - (a.stars_count || 0);
+        return (b.stargazersCount || 0) - (a.stargazersCount || 0);
       default:
         return 0;
     }
@@ -154,13 +154,6 @@ const getLanguageColor = (language?: string): string => {
 
 // 处理操作
 const handleCloneRepo = (repo: Repository) => {
-  console.log('handleCloneRepo 被调用:', {
-    repoName: repo.full_name,
-    gitUrl: repo.git_url,
-    token: getToken(),
-    userLogin: user.login
-  });
-
   selectedRepoForClone.value = repo;
   showCloneDialog.value = true;
 };
@@ -437,7 +430,7 @@ onMounted(() => {
                   <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
                   </svg>
-                  <span>{{ repo.stars_count || 0 }}</span>
+                  <span>{{ repo.stargazersCount || 0 }}</span>
                 </div>
 
                 <!-- 分叉数 -->
@@ -491,23 +484,9 @@ onMounted(() => {
     </div>
 
     <!-- 克隆对话框 -->
-    <!-- <div
-      v-if="showCloneDialog"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click="closeCloneDialog"
-    >
-      <RepoClone
-        v-if="selectedRepoForClone && getCloneConfig"
-        :initial-url="getCloneConfig.url"
-        :initial-directory="getCloneConfig.suggestedDirectory"
-        :initial-auth-config="getCloneConfig.authConfig"
-        @clone-success="closeCloneDialog"
-      />
-    </div> -->
-
-    <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
-        <div class="relative">
+    <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-hidden">
+      <div class="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div class="relative scrollbar-hide overflow-y-auto">
           <Button
             variant="ghost"
             class="absolute top-4 right-32 z-10 cursor-pointer"
@@ -522,7 +501,6 @@ onMounted(() => {
             :initial-url="getCloneConfig.url"
             :initial-directory="getCloneConfig.suggestedDirectory"
             :initial-auth-config="getCloneConfig.authConfig"
-            @clone-success="closeCloneDialog"
           />
         </div>
       </div>
