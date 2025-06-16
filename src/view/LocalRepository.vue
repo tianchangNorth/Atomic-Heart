@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RepoClone from '@/components/git/RepoClone.vue';
-import CommitManager from '@/components/git/CommitManager.vue';
-import SyncManager from '@/components/git/SyncManager.vue';
-import BranchManager from '@/components/git/BranchManager.vue';
-import ConflictDialog from '@/components/git/ui/ConflictDialog.vue';
-import type { LocalRepository, ConflictFile } from '@/types/git';
+import type { LocalRepository } from '@/types/git';
+
+const router = useRouter();
 
 // 模拟本地仓库数据
 const localRepositories = ref<LocalRepository[]>([
@@ -50,35 +49,9 @@ const localRepositories = ref<LocalRepository[]>([
   }
 ]);
 
-const selectedRepository = ref<LocalRepository | null>(null);
-const activeTab = ref('overview');
 const showCloneDialog = ref(false);
-const showConflictDialog = ref(false);
-
-// 模拟冲突文件数据
-const conflictFiles = ref<ConflictFile[]>([
-  {
-    path: 'src/components/Header.vue',
-    resolved: false,
-    conflicts: [
-      {
-        id: 'conflict-1',
-        startLine: 15,
-        endLine: 25,
-        currentContent: `<template>
-  <header class="bg-blue-600 text-white">
-    <h1>AtomDesk v2.0</h1>
-  </header>
-</template>`,
-        incomingContent: `<template>
-  <header class="bg-green-600 text-white">
-    <h1>AtomDesk v2.1</h1>
-  </header>
-</template>`
-      }
-    ]
-  }
-]);
+const searchQuery = ref('');
+const viewMode = ref<'grid' | 'list'>('grid');
 
 // 计算属性
 const repositoryStats = computed(() => {
@@ -88,6 +61,14 @@ const repositoryStats = computed(() => {
   const conflict = localRepositories.value.filter(r => r.status === 'conflict').length;
 
   return { total, clean, dirty, conflict };
+});
+
+const filteredRepositories = computed(() => {
+  if (!searchQuery.value) return localRepositories.value;
+  return localRepositories.value.filter(repo =>
+    repo.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    repo.path.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
 });
 
 const getStatusText = (status: LocalRepository['status']) => {
@@ -111,9 +92,9 @@ const getStatusBadgeVariant = (status: LocalRepository['status']) => {
 };
 
 // 方法
-const selectRepository = (repo: LocalRepository) => {
-  selectedRepository.value = repo;
-  activeTab.value = 'overview';
+const openRepositoryDetail = (repo: LocalRepository) => {
+  // 跳转到本地仓库详情页面
+  router.push(`/local-repositories/${repo.id}`);
 };
 
 const openRepository = (repo: LocalRepository) => {
@@ -125,10 +106,12 @@ const removeRepository = (repoId: string) => {
   const index = localRepositories.value.findIndex(r => r.id === repoId);
   if (index > -1) {
     localRepositories.value.splice(index, 1);
-    if (selectedRepository.value?.id === repoId) {
-      selectedRepository.value = null;
-    }
   }
+};
+
+const refreshRepository = (repo: LocalRepository) => {
+  // 这里将来会调用 API 刷新仓库状态
+  console.log('刷新仓库状态:', repo.name);
 };
 
 const formatDate = (dateString: string): string => {
@@ -141,38 +124,25 @@ const formatDate = (dateString: string): string => {
     minute: '2-digit'
   });
 };
-
-const handleConflictResolve = (files: ConflictFile[]) => {
-  console.log('冲突已解决:', files);
-  showConflictDialog.value = false;
-
-  // 更新仓库状态
-  if (selectedRepository.value) {
-    selectedRepository.value.status = 'dirty';
-  }
-};
-
-const handleConflictCancel = () => {
-  console.log('取消解决冲突');
-  showConflictDialog.value = false;
-};
 </script>
 
 <template>
   <div class="min-h-screen bg-background">
     <div class="container mx-auto px-4 py-6 max-w-7xl">
       <!-- 页面标题 -->
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 class="text-3xl font-bold text-foreground">本地仓库管理</h1>
           <p class="text-muted-foreground mt-1">管理您的本地 Git 仓库</p>
         </div>
-        <Button @click="showCloneDialog = true">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          克隆仓库
-        </Button>
+        <div class="flex items-center space-x-3">
+          <Button variant="outline" @click="showCloneDialog = true">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            克隆仓库
+          </Button>
+        </div>
       </div>
 
       <!-- 统计卡片 -->
@@ -234,180 +204,215 @@ const handleConflictCancel = () => {
         </Card>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- 左侧：仓库列表 -->
-        <div class="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle class="flex items-center space-x-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                </svg>
-                <span>本地仓库</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-3">
-                <div
-                  v-for="repo in localRepositories"
-                  :key="repo.id"
-                  class="p-3 rounded-lg border cursor-pointer transition-colors"
-                  :class="{
-                    'bg-accent border-primary': selectedRepository?.id === repo.id,
-                    'hover:bg-accent/50': selectedRepository?.id !== repo.id
-                  }"
-                  @click="selectRepository(repo)"
-                >
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="font-medium truncate">{{ repo.name }}</h3>
-                    <Badge :variant="getStatusBadgeVariant(repo.status)" class="text-xs">
-                      {{ getStatusText(repo.status) }}
-                    </Badge>
-                  </div>
-                  
-                  <div class="text-sm text-muted-foreground space-y-1">
-                    <div class="flex items-center space-x-2">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                      </svg>
-                      <span>{{ repo.currentBranch }}</span>
-                    </div>
-                    
-                    <div v-if="repo.ahead > 0 || repo.behind > 0" class="flex items-center space-x-3 text-xs">
-                      <span v-if="repo.ahead > 0" class="text-blue-600">↑{{ repo.ahead }}</span>
-                      <span v-if="repo.behind > 0" class="text-orange-600">↓{{ repo.behind }}</span>
-                    </div>
-                    
-                    <div class="truncate">{{ repo.path }}</div>
-                  </div>
-                  
-                  <div class="flex items-center justify-between mt-3">
-                    <span class="text-xs text-muted-foreground">
-                      {{ formatDate(repo.updatedAt) }}
-                    </span>
-                    <div class="flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        @click.stop="openRepository(repo)"
-                        class="h-6 w-6 p-0"
-                      >
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                        </svg>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        @click.stop="removeRepository(repo.id)"
-                        class="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                      >
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <!-- 搜索和视图控制 -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="flex-1 max-w-md">
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <Input
+              v-model="searchQuery"
+              placeholder="搜索仓库名称或路径..."
+              class="w-full pl-10"
+            />
+          </div>
         </div>
-
-        <!-- 右侧：仓库详情 -->
-        <div class="lg:col-span-2">
-          <div v-if="!selectedRepository" class="flex items-center justify-center h-96">
-            <div class="text-center text-muted-foreground">
-              <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-              </svg>
-              <p class="text-lg font-medium">选择仓库</p>
-              <p class="text-sm">从左侧列表中选择一个仓库来查看详情</p>
-            </div>
-          </div>
-
-          <div v-else>
-            <Tabs v-model="activeTab" class="w-full">
-              <TabsList class="grid w-full grid-cols-4">
-                <TabsTrigger value="overview">概览</TabsTrigger>
-                <TabsTrigger value="commits">提交</TabsTrigger>
-                <TabsTrigger value="sync">同步</TabsTrigger>
-                <TabsTrigger value="branches">分支</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" class="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle class="flex items-center justify-between">
-                      <span>{{ selectedRepository.name }}</span>
-                      <div class="flex items-center space-x-2">
-                        <Badge :variant="getStatusBadgeVariant(selectedRepository.status)">
-                          {{ getStatusText(selectedRepository.status) }}
-                        </Badge>
-                        <Button
-                          v-if="selectedRepository.status === 'conflict'"
-                          variant="destructive"
-                          size="sm"
-                          @click="showConflictDialog = true"
-                        >
-                          解决冲突
-                        </Button>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span class="font-medium">路径：</span>
-                        <span class="text-muted-foreground">{{ selectedRepository.path }}</span>
-                      </div>
-                      <div>
-                        <span class="font-medium">当前分支：</span>
-                        <span class="text-muted-foreground">{{ selectedRepository.currentBranch }}</span>
-                      </div>
-                      <div v-if="selectedRepository.remoteUrl">
-                        <span class="font-medium">远程地址：</span>
-                        <span class="text-muted-foreground">{{ selectedRepository.remoteUrl }}</span>
-                      </div>
-                      <div>
-                        <span class="font-medium">最后更新：</span>
-                        <span class="text-muted-foreground">{{ formatDate(selectedRepository.updatedAt) }}</span>
-                      </div>
-                    </div>
-                    
-                    <div v-if="selectedRepository.ahead > 0 || selectedRepository.behind > 0" class="flex items-center space-x-4 p-3 bg-muted rounded-lg">
-                      <div v-if="selectedRepository.ahead > 0" class="flex items-center space-x-2 text-blue-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                        </svg>
-                        <span>领先 {{ selectedRepository.ahead }} 个提交</span>
-                      </div>
-                      <div v-if="selectedRepository.behind > 0" class="flex items-center space-x-2 text-orange-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5l-9-2 9 18 9-18-9 2zm0 0v8"/>
-                        </svg>
-                        <span>落后 {{ selectedRepository.behind }} 个提交</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="commits" class="mt-6">
-                <CommitManager />
-              </TabsContent>
-
-              <TabsContent value="sync" class="mt-6">
-                <SyncManager />
-              </TabsContent>
-
-              <TabsContent value="branches" class="mt-6">
-                <BranchManager />
-              </TabsContent>
-            </Tabs>
-          </div>
+        <div class="flex items-center space-x-2">
+          <Button
+            :variant="viewMode === 'grid' ? 'default' : 'outline'"
+            size="sm"
+            @click="viewMode = 'grid'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+          </Button>
+          <Button
+            :variant="viewMode === 'list' ? 'default' : 'outline'"
+            size="sm"
+            @click="viewMode = 'list'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+            </svg>
+          </Button>
         </div>
       </div>
+
+      <!-- 仓库列表 -->
+      <div v-if="filteredRepositories.length === 0 && searchQuery" class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto mb-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <h3 class="text-lg font-medium text-foreground mb-2">未找到匹配的仓库</h3>
+        <p class="text-muted-foreground">尝试使用不同的关键词搜索</p>
+      </div>
+
+      <div v-else-if="filteredRepositories.length === 0" class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto mb-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+        </svg>
+        <h3 class="text-lg font-medium text-foreground mb-2">暂无本地仓库</h3>
+        <p class="text-muted-foreground mb-4">开始克隆您的第一个仓库</p>
+        <Button @click="showCloneDialog = true">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          克隆仓库
+        </Button>
+      </div>
+
+      <!-- 网格视图 -->
+      <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card
+          v-for="repo in filteredRepositories"
+          :key="repo.id"
+          class="cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1"
+          @click="openRepositoryDetail(repo)"
+        >
+          <CardHeader class="pb-3">
+            <div class="flex items-center justify-between">
+              <CardTitle class="text-lg truncate pr-2">{{ repo.name }}</CardTitle>
+              <Badge :variant="getStatusBadgeVariant(repo.status)" class="text-xs flex-shrink-0">
+                {{ getStatusText(repo.status) }}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent class="space-y-3">
+            <div class="flex items-center space-x-2 text-sm text-muted-foreground">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span class="font-medium">{{ repo.currentBranch }}</span>
+              <div v-if="repo.ahead > 0 || repo.behind > 0" class="flex items-center space-x-2 ml-auto">
+                <span v-if="repo.ahead > 0" class="text-blue-600 text-xs">↑{{ repo.ahead }}</span>
+                <span v-if="repo.behind > 0" class="text-orange-600 text-xs">↓{{ repo.behind }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2 text-sm text-muted-foreground">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+              </svg>
+              <span class="truncate">{{ repo.path }}</span>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-border">
+              <span class="text-xs text-muted-foreground">{{ formatDate(repo.updatedAt) }}</span>
+              <div class="flex space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="refreshRepository(repo)"
+                  class="h-7 w-7 p-0"
+                  title="刷新状态"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="openRepository(repo)"
+                  class="h-7 w-7 p-0"
+                  title="在文件管理器中打开"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                  </svg>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="removeRepository(repo.id)"
+                  class="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                  title="移除仓库"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <!-- 列表视图 -->
+      <div v-else class="space-y-3">
+        <Card
+          v-for="repo in filteredRepositories"
+          :key="repo.id"
+          class="cursor-pointer transition-all hover:shadow-md"
+          @click="openRepositoryDetail(repo)"
+        >
+          <CardContent class="p-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-4 flex-1 min-w-0">
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold text-lg truncate">{{ repo.name }}</h3>
+                  <p class="text-sm text-muted-foreground truncate">{{ repo.path }}</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                  <div class="flex items-center space-x-2 text-sm">
+                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>{{ repo.currentBranch }}</span>
+                  </div>
+                  <div v-if="repo.ahead > 0 || repo.behind > 0" class="flex items-center space-x-2">
+                    <span v-if="repo.ahead > 0" class="text-blue-600 text-sm">↑{{ repo.ahead }}</span>
+                    <span v-if="repo.behind > 0" class="text-orange-600 text-sm">↓{{ repo.behind }}</span>
+                  </div>
+                  <Badge :variant="getStatusBadgeVariant(repo.status)">
+                    {{ getStatusText(repo.status) }}
+                  </Badge>
+                  <span class="text-xs text-muted-foreground">{{ formatDate(repo.updatedAt) }}</span>
+                </div>
+              </div>
+              <div class="flex space-x-1 ml-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="refreshRepository(repo)"
+                  class="h-8 w-8 p-0"
+                  title="刷新状态"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="openRepository(repo)"
+                  class="h-8 w-8 p-0"
+                  title="在文件管理器中打开"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                  </svg>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click.stop="removeRepository(repo.id)"
+                  class="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                  title="移除仓库"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+    </div>
     </div>
 
     <!-- 克隆仓库弹窗 -->
@@ -427,13 +432,91 @@ const handleConflictCancel = () => {
         </div>
       </div>
     </div>
-
-    <!-- 冲突解决弹窗 -->
-    <ConflictDialog
-      v-model:open="showConflictDialog"
-      :files="conflictFiles"
-      @resolve="handleConflictResolve"
-      @cancel="handleConflictCancel"
-    />
-  </div>
 </template>
+
+<style scoped>
+/* 自定义滚动条样式 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-muted {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.scrollbar-track-transparent {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Webkit 滚动条样式 */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* 仓库卡片动画 */
+.flex-shrink-0 {
+  transition: all 0.2s ease-in-out;
+}
+
+.flex-shrink-0:hover {
+  transform: translateY(-2px);
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .w-80 {
+    width: 280px;
+  }
+}
+
+@media (max-width: 640px) {
+  .w-80 {
+    width: 240px;
+  }
+}
+
+/* 选项卡内容区域最小高度 */
+.min-h-\[600px\] {
+  min-height: 600px;
+}
+
+@media (max-width: 768px) {
+  .min-h-\[600px\] {
+    min-height: 400px;
+  }
+}
+
+/* 确保代码查看区域有足够空间 */
+:deep(.grid.grid-cols-1.lg\\:grid-cols-2) {
+  min-height: 500px;
+}
+
+:deep(.diff-viewer) {
+  min-height: 400px;
+}
+
+/* 优化移动端体验 */
+@media (max-width: 1024px) {
+  :deep(.grid.grid-cols-1.lg\\:grid-cols-2) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  :deep(.diff-viewer) {
+    min-height: 300px;
+  }
+}
+</style>

@@ -2,7 +2,7 @@
 import { ref, computed, reactive } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import Textarea from '@/components/ui/textarea/Textarea.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import DiffViewer from './ui/DiffViewer.vue';
@@ -115,24 +115,24 @@ const canCommit = computed(() => {
   return !isCommitting.value && stagedFiles.value.length > 0 && commitForm.message.trim();
 });
 
-const totalAdditions = computed(() => 
+const totalAdditions = computed(() =>
   stagedFiles.value.reduce((sum, file) => sum + file.additions, 0)
 );
 
-const totalDeletions = computed(() => 
+const totalDeletions = computed(() =>
   stagedFiles.value.reduce((sum, file) => sum + file.deletions, 0)
 );
 
 // 获取文件状态样式
 const getStatusBadge = (status: FileChange['status']) => {
   const statusConfig = {
-    added: { variant: 'default', color: 'text-green-600', label: '新增' },
-    modified: { variant: 'secondary', color: 'text-blue-600', label: '修改' },
-    deleted: { variant: 'destructive', color: 'text-red-600', label: '删除' },
-    renamed: { variant: 'outline', color: 'text-purple-600', label: '重命名' },
-    untracked: { variant: 'outline', color: 'text-gray-600', label: '未跟踪' }
+    added: { variant: 'default' as const, color: 'text-green-600', label: '新增' },
+    modified: { variant: 'secondary' as const, color: 'text-blue-600', label: '修改' },
+    deleted: { variant: 'destructive' as const, color: 'text-red-600', label: '删除' },
+    renamed: { variant: 'outline' as const, color: 'text-purple-600', label: '重命名' },
+    untracked: { variant: 'outline' as const, color: 'text-gray-600', label: '未跟踪' }
   };
-  
+
   return statusConfig[status] || statusConfig.modified;
 };
 
@@ -148,7 +148,7 @@ const getFileIcon = (path: string) => {
     css: 'text-pink-500',
     html: 'text-red-500'
   };
-  
+
   return iconMap[ext || ''] || 'text-gray-500';
 };
 
@@ -175,22 +175,22 @@ const selectFile = (filePath: string) => {
 
 const commit = async () => {
   if (!canCommit.value) return;
-  
+
   isCommitting.value = true;
-  
+
   // 模拟提交过程
   await new Promise(resolve => setTimeout(resolve, 2000));
-  
+
   // 重置表单和文件状态
   commitForm.message = '';
   commitForm.description = '';
   commitForm.amend = false;
   commitForm.signoff = false;
-  
+
   // 移除已暂存的文件
   fileChanges.value = fileChanges.value.filter(f => !f.staged);
   selectedFile.value = null;
-  
+
   isCommitting.value = false;
 };
 
@@ -200,7 +200,7 @@ const selectedFileData = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 min-h-[600px]">
     <!-- 左侧：文件变更列表和提交信息 -->
     <div class="space-y-6">
       <!-- 暂存区 -->
@@ -402,26 +402,60 @@ const selectedFileData = computed(() => {
     </div>
 
     <!-- 右侧：差异预览 -->
-    <div class="space-y-6">
-      <div v-if="selectedFileData" class="h-full">
+    <div class="flex flex-col min-h-[600px]">
+      <div v-if="selectedFileData" class="flex-1">
         <DiffViewer
           :file-name="selectedFileData.path"
           :diff="selectedFileData.diff"
           :additions="selectedFileData.additions"
           :deletions="selectedFileData.deletions"
-          max-height="calc(100vh - 200px)"
+          max-height="600px"
+          class="diff-viewer"
         />
       </div>
-      
-      <div v-else class="flex items-center justify-center h-full">
+
+      <div v-else class="flex-1 flex items-center justify-center">
         <div class="text-center text-muted-foreground">
           <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
           <p class="text-lg font-medium">选择文件查看差异</p>
           <p class="text-sm">点击左侧文件列表中的文件来查看详细变更</p>
+          <p class="text-xs text-muted-foreground mt-2">💡 新布局为代码查看提供了更宽的显示空间</p>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 优化代码查看体验 */
+.diff-viewer {
+  min-height: 400px;
+}
+
+/* 响应式布局优化 */
+@media (max-width: 1280px) {
+  .grid.grid-cols-1.xl\\:grid-cols-2 {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .diff-viewer {
+    min-height: 300px;
+  }
+}
+
+/* 文件列表项悬停效果 */
+.cursor-pointer:hover {
+  transform: translateY(-1px);
+  transition: all 0.2s ease-in-out;
+}
+
+/* 确保在小屏幕上有足够的空间 */
+@media (max-width: 768px) {
+  .min-h-\[600px\] {
+    min-height: 400px;
+  }
+}
+</style>
