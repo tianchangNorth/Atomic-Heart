@@ -417,7 +417,7 @@ const formatDate = (dateString: string): string => {
 
     <!-- 克隆仓库弹窗 -->
     <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
         <div class="relative">
           <Button
             variant="ghost"
@@ -518,5 +518,17 @@ const formatDate = (dateString: string): string => {
   :deep(.diff-viewer) {
     min-height: 300px;
   }
+}
+
+/* 全局样式中添加（例如 Tailwind 的 utilities.css 或 index.css） */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* IE/Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 </style>

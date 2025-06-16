@@ -19,11 +19,13 @@
       }
     ],
     "security": {
-      "csp": null 
+      "csp": null
     }
   },
+
   "plugins": {
-    "opener": null
+    "opener": null,
+    "dialog": null
   },
   "bundle": {
     "active": true,

@@ -1,6 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri::{ Emitter };
 mod http_client; // 导入新模块
+mod git;
+mod commands;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -69,13 +71,31 @@ async fn open_url(url: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_oauth::init())
+        .manage(commands::git::GitState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             open_url,
             start_oauth_callback_server, // 添加新命令
             http_client::http_get,
-            http_client::http_post
+            http_client::http_post,
+            // Git 命令
+            commands::git::clone_repository,
+            commands::git::validate_repository_url,
+            commands::git::detect_auth_type,
+            commands::git::get_default_ssh_keys,
+            commands::git::validate_ssh_key,
+            commands::git::store_credentials,
+            commands::git::load_credentials,
+            commands::git::delete_credentials,
+            commands::git::extract_username_from_url,
+            commands::git::cancel_clone_operation,
+            commands::git::get_clone_operation_status,
+            commands::git::cleanup_clone_operation,
+            commands::git::select_directory,
+            commands::git::select_ssh_key_file,
+            commands::git::validate_clone_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
