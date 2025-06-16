@@ -25,7 +25,8 @@
 
   "plugins": {
     "opener": null,
-    "dialog": null
+    "dialog": null,
+    "store": null
   },
   "bundle": {
     "active": true,

@@ -11,6 +11,7 @@ import RepositoryDetail from '@/view/RepositoryDetail.vue'
 import LocalRepository from '@/view/LocalRepository.vue'
 import LocalRepositoryDetail from '@/view/LocalRepositoryDetail.vue'
 import Projects from '@/view/Projects.vue'
+import Settings from '@/view/Settings.vue'
 
 const routes = [
   {
@@ -24,6 +25,7 @@ const routes = [
       { path: '/local-repositories', component: LocalRepository, name: 'LocalRepository' },
       { path: '/local-repositories/:id', component: LocalRepositoryDetail, name: 'LocalRepositoryDetail', props: true },
       { path: '/projects', component: Projects, name: 'Projects' },
+      { path: '/settings', component: Settings, name: 'Settings' },
     ]
   },
   {
