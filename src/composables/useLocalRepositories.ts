@@ -79,10 +79,7 @@ export const useLocalRepositories = () => {
 
       await store.set(STORE_KEY, data);
       await store.save();
-
-      console.log('仓库列表已保存');
     } catch (error) {
-      console.error('保存仓库列表失败:', error);
       lastError.value = '保存仓库列表失败';
       throw error;
     }
