@@ -209,7 +209,6 @@ const detectAuthType = async () => {
     // SSH URL 自动转换提示
     if (authType === 'ssh' && cloneForm.url.startsWith('git@')) {
       const httpsUrl = convertSshToHttpsUrl(cloneForm.url);
-      console.log(`检测到SSH URL，建议使用HTTPS: ${httpsUrl}`);
 
       // 可以在这里添加用户提示
       showSshToHttpsHint.value = {
