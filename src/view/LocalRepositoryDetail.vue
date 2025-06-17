@@ -5,102 +5,38 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocalRepositories } from '@/composables/useLocalRepositories';
+import type { LocalRepository } from '@/types/local-repository';
 import CommitManager from '@/components/git/CommitManager.vue';
 import SyncManager from '@/components/git/SyncManager.vue';
 import BranchManager from '@/components/git/BranchManager.vue';
-import ConflictDialog from '@/components/git/ui/ConflictDialog.vue';
-import type { LocalRepository, ConflictFile } from '@/types/git';
 
 const route = useRoute();
 const router = useRouter();
 
+// 使用本地仓库管理
+const { getRepository } = useLocalRepositories();
+
 // 组件状态
 const repository = ref<LocalRepository | null>(null);
 const activeTab = ref('overview');
-const showConflictDialog = ref(false);
 const isLoading = ref(true);
-
-// 模拟冲突文件数据
-const conflictFiles = ref<ConflictFile[]>([
-  {
-    path: 'src/components/Header.vue',
-    resolved: false,
-    conflicts: [
-      {
-        id: 'conflict-1',
-        startLine: 15,
-        endLine: 25,
-        currentContent: `<template>
-  <header class="bg-blue-600 text-white">
-    <h1>AtomDesk v2.0</h1>
-  </header>
-</template>`,
-        incomingContent: `<template>
-  <header class="bg-green-600 text-white">
-    <h1>AtomDesk v2.1</h1>
-  </header>
-</template>`
-      }
-    ]
-  }
-]);
-
-// 模拟仓库数据（实际应该从 API 获取）
-const mockRepositories: LocalRepository[] = [
-  {
-    id: '1',
-    name: 'AtomDesk',
-    path: '/Users/developer/Projects/AtomDesk',
-    remoteUrl: 'https://github.com/user/AtomDesk.git',
-    currentBranch: 'main',
-    status: 'dirty',
-    ahead: 2,
-    behind: 1,
-    createdAt: '2024-12-10T10:00:00Z',
-    updatedAt: '2024-12-15T14:30:00Z'
-  },
-  {
-    id: '2',
-    name: 'vue-components',
-    path: '/Users/developer/Projects/vue-components',
-    remoteUrl: 'https://github.com/user/vue-components.git',
-    currentBranch: 'develop',
-    status: 'clean',
-    ahead: 0,
-    behind: 0,
-    createdAt: '2024-12-08T15:30:00Z',
-    updatedAt: '2024-12-14T09:15:00Z'
-  },
-  {
-    id: '3',
-    name: 'api-server',
-    path: '/Users/developer/Projects/api-server',
-    currentBranch: 'feature/auth',
-    status: 'conflict',
-    ahead: 3,
-    behind: 2,
-    createdAt: '2024-12-05T11:20:00Z',
-    updatedAt: '2024-12-15T16:45:00Z'
-  }
-];
 
 // 计算属性
 const getStatusText = (status: LocalRepository['status']) => {
   switch (status) {
-    case 'clean': return '干净';
-    case 'dirty': return '有变更';
-    case 'conflict': return '有冲突';
-    case 'syncing': return '同步中';
+    case 'valid': return '有效';
+    case 'invalid': return '无效';
+    case 'unknown': return '未知';
     default: return '未知';
   }
 };
 
 const getStatusBadgeVariant = (status: LocalRepository['status']) => {
   switch (status) {
-    case 'clean': return 'default';
-    case 'dirty': return 'secondary';
-    case 'conflict': return 'destructive';
-    case 'syncing': return 'outline';
+    case 'valid': return 'default';
+    case 'invalid': return 'destructive';
+    case 'unknown': return 'secondary';
     default: return 'outline';
   }
 };
@@ -109,18 +45,22 @@ const getStatusBadgeVariant = (status: LocalRepository['status']) => {
 const loadRepository = async () => {
   const repoId = route.params.id as string;
 
-  // 模拟 API 调用
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  const repo = mockRepositories.find(r => r.id === repoId);
-  if (repo) {
-    repository.value = repo;
-  } else {
-    // 仓库不存在，返回列表页
+  try {
+    // 从本地存储获取仓库信息
+    const repo = getRepository(repoId);
+    if (repo) {
+      repository.value = repo;
+    } else {
+      // 仓库不存在，返回列表页
+      console.warn('仓库不存在:', repoId);
+      router.push('/local-repositories');
+    }
+  } catch (error) {
+    console.error('加载仓库失败:', error);
     router.push('/local-repositories');
+  } finally {
+    isLoading.value = false;
   }
-
-  isLoading.value = false;
 };
 
 const goBack = () => {
@@ -152,20 +92,7 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-const handleConflictResolve = (files: ConflictFile[]) => {
-  console.log('冲突已解决:', files);
-  showConflictDialog.value = false;
-
-  // 更新仓库状态
-  if (repository.value) {
-    repository.value.status = 'dirty';
-  }
-};
-
-const handleConflictCancel = () => {
-  console.log('取消解决冲突');
-  showConflictDialog.value = false;
-};
+// 移除冲突相关的处理函数，因为新的数据结构不包含冲突状态
 
 // 生命周期
 onMounted(() => {
@@ -226,16 +153,7 @@ onMounted(() => {
               </svg>
               打开文件夹
             </Button>
-            <Button
-              v-if="repository.status === 'conflict'"
-              variant="destructive"
-              @click="showConflictDialog = true"
-            >
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
-              解决冲突
-            </Button>
+            <!-- 冲突解决按钮已移除，因为新的数据结构不包含冲突状态 -->
           </div>
         </div>
 
@@ -249,7 +167,7 @@ onMounted(() => {
                 </svg>
                 <div>
                   <p class="text-sm text-muted-foreground">当前分支</p>
-                  <p class="font-semibold">{{ repository.currentBranch }}</p>
+                  <p class="font-semibold">{{ repository.currentBranch || '未知' }}</p>
                 </div>
               </div>
             </CardContent>
@@ -259,11 +177,11 @@ onMounted(() => {
             <CardContent class="p-4">
               <div class="flex items-center space-x-3">
                 <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <div>
-                  <p class="text-sm text-muted-foreground">领先提交</p>
-                  <p class="font-semibold text-blue-600">{{ repository.ahead }}</p>
+                  <p class="text-sm text-muted-foreground">仓库状态</p>
+                  <p class="font-semibold">{{ getStatusText(repository.status) }}</p>
                 </div>
               </div>
             </CardContent>
@@ -272,12 +190,12 @@ onMounted(() => {
           <Card>
             <CardContent class="p-4">
               <div class="flex items-center space-x-3">
-                <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5l-9-2 9 18 9-18-9 2zm0 0v8"/>
+                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <div>
-                  <p class="text-sm text-muted-foreground">落后提交</p>
-                  <p class="font-semibold text-orange-600">{{ repository.behind }}</p>
+                  <p class="text-sm text-muted-foreground">添加时间</p>
+                  <p class="font-semibold">{{ formatDate(repository.addedAt) }}</p>
                 </div>
               </div>
             </CardContent>
@@ -318,12 +236,12 @@ onMounted(() => {
                       <p class="font-medium break-all">{{ repository.remoteUrl }}</p>
                     </div>
                     <div>
-                      <span class="text-muted-foreground">创建时间：</span>
-                      <p class="font-medium">{{ formatDate(repository.createdAt) }}</p>
+                      <span class="text-muted-foreground">添加时间：</span>
+                      <p class="font-medium">{{ formatDate(repository.addedAt) }}</p>
                     </div>
-                    <div>
-                      <span class="text-muted-foreground">最后更新：</span>
-                      <p class="font-medium">{{ formatDate(repository.updatedAt) }}</p>
+                    <div v-if="repository.lastChecked">
+                      <span class="text-muted-foreground">最后检查：</span>
+                      <p class="font-medium">{{ formatDate(repository.lastChecked) }}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -331,7 +249,7 @@ onMounted(() => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>同步状态</CardTitle>
+                  <CardTitle>仓库信息</CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-4">
                   <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -340,13 +258,17 @@ onMounted(() => {
                       {{ getStatusText(repository.status) }}
                     </Badge>
                   </div>
-                  <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <span class="text-sm font-medium">领先提交</span>
-                    <Badge variant="outline" class="text-blue-600">{{ repository.ahead }}</Badge>
+                  <div v-if="repository.remoteUrl" class="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <span class="text-sm font-medium">远程仓库</span>
+                    <Badge variant="outline" class="text-green-600">已配置</Badge>
+                  </div>
+                  <div v-else class="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <span class="text-sm font-medium">远程仓库</span>
+                    <Badge variant="outline" class="text-gray-600">未配置</Badge>
                   </div>
                   <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <span class="text-sm font-medium">落后提交</span>
-                    <Badge variant="outline" class="text-orange-600">{{ repository.behind }}</Badge>
+                    <span class="text-sm font-medium">当前分支</span>
+                    <Badge variant="outline" class="text-blue-600">{{ repository.currentBranch || '未知' }}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -368,13 +290,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 冲突解决弹窗 -->
-    <ConflictDialog
-      v-model:open="showConflictDialog"
-      :files="conflictFiles"
-      @resolve="handleConflictResolve"
-      @cancel="handleConflictCancel"
-    />
+    <!-- 冲突解决弹窗已移除，因为新的数据结构不包含冲突状态 -->
   </div>
 </template>
 

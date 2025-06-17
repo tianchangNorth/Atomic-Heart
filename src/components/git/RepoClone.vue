@@ -393,9 +393,15 @@ const startClone = async () => {
           gitApi.storeCredentials(cloneForm.url, authConfig).catch(console.error);
         }
 
-        // 发出克隆成功事件
+        // 发出克隆成功事件，添加原始 URL 信息
         if (result.success) {
-          emit('cloneSuccess', result);
+          const enrichedResult = {
+            ...result,
+            repository_url: cloneForm.url, // 添加原始仓库 URL
+            target_directory: cloneForm.directory, // 添加目标目录
+            branch: cloneForm.branch || 'main' // 添加分支信息
+          };
+          emit('cloneSuccess', enrichedResult);
         }
       },
       (error) => {
