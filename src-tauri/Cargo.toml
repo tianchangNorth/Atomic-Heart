@@ -33,7 +33,6 @@ warp = "0.3"
 futures = "0.3"
 tokio-util = "0.7"
 
-# Git 操作相关 - 升级到最新版本以支持现代 SSH 算法
 git2 = { version = "0.18", features = ["https", "ssh"] }
 anyhow = "1.0"
 thiserror = "1.0"
