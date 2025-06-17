@@ -17,7 +17,10 @@ const {
   repositories,
   removeRepository: removeRepo,
   addRepository,
-  loadRepositories
+  loadRepositories,
+  refreshRepository: refreshRepoStatus,
+  refreshAllRepositories,
+  openRepositoryFolder
 } = useLocalRepositories();
 
 // 组件状态
@@ -68,9 +71,17 @@ const openRepositoryDetail = (repo: LocalRepository) => {
   router.push(`/local-repositories/${repo.id}`);
 };
 
-const openRepository = (repo: LocalRepository) => {
-  // 这里将来会调用 Tauri API 打开文件夹
-  console.log('打开仓库:', repo.path);
+const openRepository = async (repo: LocalRepository) => {
+  try {
+    const result = await openRepositoryFolder(repo.id);
+    if (result.success) {
+      console.log('文件夹已打开:', repo.path);
+    } else {
+      console.error('打开文件夹失败:', result.message);
+    }
+  } catch (error) {
+    console.error('打开仓库文件夹时出错:', error);
+  }
 };
 
 const handleRemoveRepository = async (repoId: string) => {
@@ -86,9 +97,32 @@ const handleRemoveRepository = async (repoId: string) => {
   }
 };
 
-const refreshRepository = (repo: LocalRepository) => {
-  // 这里将来会调用 API 刷新仓库状态
-  console.log('刷新仓库状态:', repo.name);
+const refreshRepository = async (repo: LocalRepository) => {
+  try {
+    console.log('开始刷新仓库状态:', repo.name);
+    const result = await refreshRepoStatus(repo.id);
+    if (result.success) {
+      console.log('仓库状态刷新成功:', result.message);
+    } else {
+      console.error('刷新仓库状态失败:', result.message);
+    }
+  } catch (error) {
+    console.error('刷新仓库状态时出错:', error);
+  }
+};
+
+const handleRefreshAll = async () => {
+  try {
+    console.log('开始刷新所有仓库状态');
+    const result = await refreshAllRepositories();
+    if (result.success) {
+      console.log('所有仓库状态刷新成功:', result.message);
+    } else {
+      console.error('刷新所有仓库状态失败:', result.message);
+    }
+  } catch (error) {
+    console.error('刷新所有仓库状态时出错:', error);
+  }
 };
 
 // 处理克隆成功事件
@@ -201,6 +235,11 @@ const extractRepositoryName = (url: string): string => {
   }
 };
 
+// 将 SSH URL 转换为 HTTPS URL（暂时保留，未来可能用于自动回退）
+// const convertSshToHttps = (sshUrl: string): string => {
+//   // 实现逻辑...
+// };
+
 // 从路径中提取文件夹名称
 const extractFolderName = (path: string): string => {
   try {
@@ -280,6 +319,12 @@ onMounted(async () => {
           <p class="text-muted-foreground mt-1">管理您的本地 Git 仓库</p>
         </div>
         <div class="flex items-center space-x-3">
+          <Button variant="outline" @click="handleRefreshAll">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            刷新所有
+          </Button>
           <Button variant="outline" @click="handleImportRepository">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>

@@ -15,7 +15,7 @@ const route = useRoute();
 const router = useRouter();
 
 // 使用本地仓库管理
-const { getRepository } = useLocalRepositories();
+const { getRepository, openRepositoryFolder, refreshRepository: refreshRepoStatus } = useLocalRepositories();
 
 // 组件状态
 const repository = ref<LocalRepository | null>(null);
@@ -67,17 +67,36 @@ const goBack = () => {
   router.push('/local-repositories');
 };
 
-const openRepository = () => {
+const openRepository = async () => {
   if (repository.value) {
-    // 这里将来会调用 Tauri API 打开文件夹
-    console.log('打开仓库:', repository.value.path);
+    try {
+      const result = await openRepositoryFolder(repository.value.id);
+      if (result.success) {
+        console.log('文件夹已打开:', repository.value.path);
+      } else {
+        console.error('打开文件夹失败:', result.message);
+      }
+    } catch (error) {
+      console.error('打开仓库文件夹时出错:', error);
+    }
   }
 };
 
 const refreshRepository = async () => {
   if (repository.value) {
-    // 这里将来会调用 API 刷新仓库状态
-    console.log('刷新仓库状态:', repository.value.name);
+    try {
+      console.log('开始刷新仓库状态:', repository.value.name);
+      const result = await refreshRepoStatus(repository.value.id);
+      if (result.success) {
+        console.log('仓库状态刷新成功:', result.message);
+        // 重新加载仓库信息以显示最新状态
+        await loadRepository();
+      } else {
+        console.error('刷新仓库状态失败:', result.message);
+      }
+    } catch (error) {
+      console.error('刷新仓库状态时出错:', error);
+    }
   }
 };
 

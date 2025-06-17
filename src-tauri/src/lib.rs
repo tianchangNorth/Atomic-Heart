@@ -96,7 +96,13 @@ pub fn run() {
             commands::git::cleanup_clone_operation,
             commands::git::select_directory,
             commands::git::select_ssh_key_file,
-            commands::git::validate_clone_directory
+            commands::git::validate_clone_directory,
+            // 新增的 Git 信息获取命令
+            commands::git::is_git_repository,
+            commands::git::get_repository_info,
+            commands::git::get_current_branch,
+            commands::git::get_remote_url,
+            commands::git::open_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -206,6 +206,18 @@ const detectAuthType = async () => {
     const authType = await gitApi.detectAuthType(cloneForm.url);
     cloneForm.authType = authType as AuthType;
 
+    // SSH URL 自动转换提示
+    if (authType === 'ssh' && cloneForm.url.startsWith('git@')) {
+      const httpsUrl = convertSshToHttpsUrl(cloneForm.url);
+      console.log(`检测到SSH URL，建议使用HTTPS: ${httpsUrl}`);
+
+      // 可以在这里添加用户提示
+      showSshToHttpsHint.value = {
+        sshUrl: cloneForm.url,
+        httpsUrl: httpsUrl
+      };
+    }
+
     // 尝试加载已保存的凭据
     const savedAuth = await gitApi.loadCredentials(cloneForm.url);
     if (savedAuth) {
@@ -220,6 +232,19 @@ const detectAuthType = async () => {
     console.error('检测认证类型失败:', error);
   }
 };
+
+// SSH到HTTPS URL转换
+const convertSshToHttpsUrl = (sshUrl: string): string => {
+  const match = sshUrl.match(/git@([^:]+):(.+)/);
+  if (match) {
+    const [, host, path] = match;
+    return `https://${host}/${path}`;
+  }
+  return sshUrl;
+};
+
+// SSH转换提示状态
+const showSshToHttpsHint = ref<{ sshUrl: string, httpsUrl: string } | null>(null);
 
 const selectDirectory = async () => {
   try {
@@ -275,11 +300,11 @@ const selectSshKeyFile = async () => {
       filters: [
         {
           name: 'SSH 密钥文件',
-          extensions: ['pem', 'key', 'rsa', 'ed25519', 'ecdsa', 'dsa']
+          extensions: ['*'] // SSH 密钥文件通常没有扩展名，如 id_ed25519, id_rsa
         },
         {
-          name: '所有文件',
-          extensions: ['*']
+          name: 'PEM 格式密钥',
+          extensions: ['pem', 'key']
         }
       ]
     });
@@ -582,7 +607,7 @@ const resetForm = () => {
             <div class="flex space-x-2">
               <Input
                 v-model="cloneForm.sshKeyPath"
-                placeholder="~/.ssh/id_rsa"
+                placeholder="~/.ssh/id_ed25519 或 ~/.ssh/id_rsa"
                 class="flex-1"
                 @blur="validateSshKey"
               />

@@ -89,16 +89,29 @@ impl AuthManager {
                     let public_key_path = Self::get_public_key_path(key_path);
                     let passphrase = auth.ssh_key_passphrase.as_deref();
 
+                    log::debug!(
+                        "使用 SSH 密钥: private={}, public={:?}",
+                        key_path,
+                        public_key_path
+                    );
+
                     Cred::ssh_key(
                         username,
                         public_key_path.as_ref().map(|p| Path::new(p)),
                         Path::new(key_path),
                         passphrase,
                     )
-                    .map_err(GitError::Git)
+                    .map_err(|e| {
+                        log::error!("SSH 密钥认证失败: {}", e);
+                        GitError::Git(e)
+                    })
                 } else {
                     // 尝试使用 SSH Agent
-                    Cred::ssh_key_from_agent(username).map_err(GitError::Git)
+                    log::debug!("尝试使用 SSH Agent 认证");
+                    Cred::ssh_key_from_agent(username).map_err(|e| {
+                        log::error!("SSH Agent 认证失败: {}", e);
+                        GitError::Git(e)
+                    })
                 }
             }
         }
@@ -223,16 +236,28 @@ impl AuthManager {
         if let Some(home_dir) = dirs::home_dir() {
             let ssh_dir = home_dir.join(".ssh");
 
-            // 常见的 SSH 密钥文件名
-            let key_names = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
+            // 按优先级排序的 SSH 密钥文件名（优先使用更安全的算法）
+            let key_names = [
+                "id_ed25519", // 最安全，GitHub 推荐
+                "id_ecdsa",   // 较安全
+                "id_rsa",     // 传统算法，但仍被支持
+                "id_dsa",     // 较旧的算法
+            ];
 
             for key_name in &key_names {
                 let key_path = ssh_dir.join(key_name);
                 if key_path.exists() {
                     if let Some(path_str) = key_path.to_str() {
+                        log::debug!("发现 SSH 密钥: {}", path_str);
                         keys.push(path_str.to_string());
                     }
                 }
+            }
+
+            if keys.is_empty() {
+                log::warn!("未找到任何 SSH 密钥文件在: {:?}", ssh_dir);
+            } else {
+                log::info!("找到 {} 个 SSH 密钥文件", keys.len());
             }
         }
 

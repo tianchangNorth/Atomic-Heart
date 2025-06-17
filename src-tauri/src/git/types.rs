@@ -157,6 +157,12 @@ pub enum GitError {
 
     #[error("未知错误: {message}")]
     Unknown { message: String },
+
+    #[error("系统Git未找到")]
+    SystemGitNotFound,
+
+    #[error("系统Git执行失败: {message}")]
+    SystemGitFailed { message: String },
 }
 
 impl Serialize for GitError {
@@ -181,6 +187,8 @@ impl GitError {
             GitError::InvalidUrl { .. } => "invalid_url",
             GitError::DirectoryExists { .. } => "directory_exists",
             GitError::Unknown { .. } => "unknown",
+            GitError::SystemGitNotFound => "system_git_not_found",
+            GitError::SystemGitFailed { .. } => "system_git_failed",
         }
     }
 }

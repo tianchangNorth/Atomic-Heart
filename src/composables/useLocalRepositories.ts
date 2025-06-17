@@ -1,5 +1,6 @@
 import { ref, computed, readonly } from 'vue';
 import { Store } from '@tauri-apps/plugin-store';
+import { gitInfoApi, type RepositoryInfo } from '@/api/git-info';
 import type {
   LocalRepository,
   LocalRepositoryStore,
@@ -45,7 +46,7 @@ export const useLocalRepositories = () => {
       }
 
       const data = await store.get<LocalRepositoryStore>(STORE_KEY);
-      
+
       if (data && data.repositories) {
         repositories.value = data.repositories;
         console.log(`加载了 ${data.repositories.length} 个本地仓库`);
@@ -78,7 +79,7 @@ export const useLocalRepositories = () => {
 
       await store.set(STORE_KEY, data);
       await store.save();
-      
+
       console.log('仓库列表已保存');
     } catch (error) {
       console.error('保存仓库列表失败:', error);
@@ -89,7 +90,31 @@ export const useLocalRepositories = () => {
 
   // 生成唯一 ID
   const generateId = (): string => {
-    return `repo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `repo_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  };
+
+  // 验证并获取仓库信息
+  const validateAndGetRepositoryInfo = async (path: string): Promise<{
+    isValid: boolean;
+    info: RepositoryInfo | null;
+    status: 'valid' | 'invalid' | 'unknown';
+  }> => {
+    try {
+      const result = await gitInfoApi.validateAndGetInfo(path);
+
+      return {
+        isValid: result.isValid,
+        info: result.info,
+        status: result.isValid ? 'valid' : 'invalid'
+      };
+    } catch (error) {
+      console.error('验证仓库信息失败:', error);
+      return {
+        isValid: false,
+        info: null,
+        status: 'unknown'
+      };
+    }
   };
 
   // 验证仓库数据
@@ -120,14 +145,33 @@ export const useLocalRepositories = () => {
         return validation;
       }
 
+      console.log('开始验证仓库信息:', params.path);
+
+      // 验证并获取 Git 仓库信息
+      const repoValidation = await validateAndGetRepositoryInfo(params.path);
+
+      // 使用 Git 信息或用户提供的信息
+      const repoName = repoValidation.info?.name || params.name.trim();
+      const remoteUrl = repoValidation.info?.remote_url || params.remoteUrl?.trim() || undefined;
+      const currentBranch = repoValidation.info?.current_branch || params.currentBranch?.trim() || undefined;
+
+      console.log('仓库验证结果:', {
+        isValid: repoValidation.isValid,
+        status: repoValidation.status,
+        name: repoName,
+        remoteUrl,
+        currentBranch
+      });
+
       const newRepository: LocalRepository = {
         id: generateId(),
-        name: params.name.trim(),
+        name: repoName,
         path: params.path.trim(),
-        remoteUrl: params.remoteUrl?.trim() || undefined,
-        currentBranch: params.currentBranch?.trim() || undefined,
+        remoteUrl,
+        currentBranch,
         addedAt: new Date().toISOString(),
-        status: 'unknown'
+        lastChecked: new Date().toISOString(),
+        status: repoValidation.status
       };
 
       repositories.value.unshift(newRepository); // 添加到列表开头
@@ -135,7 +179,7 @@ export const useLocalRepositories = () => {
 
       return {
         success: true,
-        message: '仓库添加成功',
+        message: `仓库添加成功 (状态: ${repoValidation.status})`,
         data: newRepository
       };
     } catch (error) {
@@ -213,12 +257,117 @@ export const useLocalRepositories = () => {
     return repositories.value.find(repo => repo.path === path);
   };
 
+  // 刷新仓库状态
+  const refreshRepository = async (id: string): Promise<RepositoryOperationResult> => {
+    try {
+      const index = repositories.value.findIndex(repo => repo.id === id);
+      if (index === -1) {
+        return { success: false, message: '仓库不存在' };
+      }
+
+      const repo = repositories.value[index];
+      console.log('刷新仓库状态:', repo.path);
+
+      // 重新验证仓库信息
+      const repoValidation = await validateAndGetRepositoryInfo(repo.path);
+
+      // 更新仓库信息
+      const updatedRepo = {
+        ...repo,
+        name: repoValidation.info?.name || repo.name,
+        remoteUrl: repoValidation.info?.remote_url || repo.remoteUrl,
+        currentBranch: repoValidation.info?.current_branch || repo.currentBranch,
+        status: repoValidation.status,
+        lastChecked: new Date().toISOString()
+      };
+
+      repositories.value[index] = updatedRepo;
+      await saveRepositories();
+
+      return {
+        success: true,
+        message: `仓库状态已刷新 (${repoValidation.status})`,
+        data: updatedRepo
+      };
+    } catch (error) {
+      console.error('刷新仓库状态失败:', error);
+      return {
+        success: false,
+        message: '刷新仓库状态失败: ' + (error as Error).message
+      };
+    }
+  };
+
+  // 批量刷新所有仓库状态
+  const refreshAllRepositories = async (): Promise<RepositoryOperationResult> => {
+    try {
+      console.log('开始批量刷新仓库状态');
+
+      const refreshPromises = repositories.value.map(async (repo) => {
+        const repoValidation = await validateAndGetRepositoryInfo(repo.path);
+        return {
+          ...repo,
+          name: repoValidation.info?.name || repo.name,
+          remoteUrl: repoValidation.info?.remote_url || repo.remoteUrl,
+          currentBranch: repoValidation.info?.current_branch || repo.currentBranch,
+          status: repoValidation.status,
+          lastChecked: new Date().toISOString()
+        };
+      });
+
+      const updatedRepositories = await Promise.all(refreshPromises);
+      repositories.value = updatedRepositories;
+      await saveRepositories();
+
+      return {
+        success: true,
+        message: `已刷新 ${updatedRepositories.length} 个仓库的状态`
+      };
+    } catch (error) {
+      console.error('批量刷新仓库状态失败:', error);
+      return {
+        success: false,
+        message: '批量刷新仓库状态失败: ' + (error as Error).message
+      };
+    }
+  };
+
+  // 打开仓库文件夹
+  const openRepositoryFolder = async (id: string): Promise<RepositoryOperationResult> => {
+    try {
+      const repo = getRepository(id);
+      if (!repo) {
+        return { success: false, message: '仓库不存在' };
+      }
+
+      const success = await gitInfoApi.openFolder(repo.path);
+
+      if (success) {
+        return {
+          success: true,
+          message: '文件夹已打开'
+        };
+      } else {
+        return {
+          success: false,
+          message: '打开文件夹失败'
+        };
+      }
+    } catch (error) {
+      console.error('打开仓库文件夹失败:', error);
+      return {
+        success: false,
+        message: '打开仓库文件夹失败: ' + (error as Error).message
+      };
+    }
+  };
+
   // 清空所有仓库
   const clearRepositories = async (): Promise<RepositoryOperationResult> => {
     try {
       repositories.value = [];
       await saveRepositories();
-      
+
       return { success: true, message: '已清空所有仓库' };
     } catch (error) {
       console.error('清空仓库失败:', error);
@@ -232,10 +381,10 @@ export const useLocalRepositories = () => {
   // 计算属性
   const repositoryCount = computed(() => repositories.value.length);
   const hasRepositories = computed(() => repositories.value.length > 0);
-  const validRepositories = computed(() => 
+  const validRepositories = computed(() =>
     repositories.value.filter(repo => repo.status === 'valid')
   );
-  const invalidRepositories = computed(() => 
+  const invalidRepositories = computed(() =>
     repositories.value.filter(repo => repo.status === 'invalid')
   );
 
@@ -244,13 +393,13 @@ export const useLocalRepositories = () => {
     repositories: readonly(repositories),
     isLoading: readonly(isLoading),
     lastError: readonly(lastError),
-    
+
     // 计算属性
     repositoryCount,
     hasRepositories,
     validRepositories,
     invalidRepositories,
-    
+
     // 方法
     initStore,
     loadRepositories,
@@ -259,6 +408,9 @@ export const useLocalRepositories = () => {
     updateRepository,
     getRepository,
     getRepositoryByPath,
+    refreshRepository,
+    refreshAllRepositories,
+    openRepositoryFolder,
     clearRepositories
   };
 };

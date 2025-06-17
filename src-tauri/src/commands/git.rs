@@ -1,4 +1,5 @@
 use crate::git::{AuthConfig, AuthManager, CloneManager, CloneOptions, CloneResult};
+use git2::Repository;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -304,4 +305,196 @@ pub struct DirectoryValidation {
     pub is_empty: bool,
     pub is_writable: bool,
     pub message: String,
+}
+
+/// 仓库信息结构
+#[derive(serde::Serialize)]
+pub struct RepositoryInfo {
+    pub name: String,
+    pub remote_url: Option<String>,
+    pub current_branch: Option<String>,
+    pub is_valid: bool,
+}
+
+/// 验证指定路径是否为有效的 Git 仓库
+#[command]
+pub async fn is_git_repository(path: String) -> Result<bool, String> {
+    log::debug!("验证 Git 仓库: {}", path);
+
+    let repo_path = Path::new(&path);
+
+    // 检查路径是否存在
+    if !repo_path.exists() {
+        return Ok(false);
+    }
+
+    // 尝试打开 Git 仓库
+    match Repository::open(repo_path) {
+        Ok(_) => {
+            log::debug!("路径是有效的 Git 仓库: {}", path);
+            Ok(true)
+        }
+        Err(e) => {
+            log::debug!("路径不是有效的 Git 仓库: {}, 错误: {}", path, e);
+            Ok(false)
+        }
+    }
+}
+
+/// 获取仓库基本信息
+#[command]
+pub async fn get_repository_info(path: String) -> Result<RepositoryInfo, String> {
+    log::debug!("获取仓库信息: {}", path);
+
+    let repo_path = Path::new(&path);
+
+    // 从路径提取仓库名称
+    let repo_name = repo_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Unknown Repository")
+        .to_string();
+
+    // 尝试打开 Git 仓库
+    match Repository::open(repo_path) {
+        Ok(repo) => {
+            // 获取远程 URL
+            let remote_url = get_remote_url_internal(&repo);
+
+            // 获取当前分支
+            let current_branch = get_current_branch_internal(&repo);
+
+            Ok(RepositoryInfo {
+                name: repo_name,
+                remote_url,
+                current_branch,
+                is_valid: true,
+            })
+        }
+        Err(e) => {
+            log::warn!("无法打开 Git 仓库: {}, 错误: {}", path, e);
+            Ok(RepositoryInfo {
+                name: repo_name,
+                remote_url: None,
+                current_branch: None,
+                is_valid: false,
+            })
+        }
+    }
+}
+
+/// 获取仓库当前分支名称
+#[command]
+pub async fn get_current_branch(path: String) -> Result<Option<String>, String> {
+    log::debug!("获取当前分支: {}", path);
+
+    let repo_path = Path::new(&path);
+
+    match Repository::open(repo_path) {
+        Ok(repo) => {
+            let branch = get_current_branch_internal(&repo);
+            Ok(branch)
+        }
+        Err(e) => {
+            log::error!("无法打开 Git 仓库: {}, 错误: {}", path, e);
+            Err(format!("无法打开 Git 仓库: {}", e))
+        }
+    }
+}
+
+/// 获取仓库的远程 URL
+#[command]
+pub async fn get_remote_url(path: String) -> Result<Option<String>, String> {
+    log::debug!("获取远程 URL: {}", path);
+
+    let repo_path = Path::new(&path);
+
+    match Repository::open(repo_path) {
+        Ok(repo) => {
+            let url = get_remote_url_internal(&repo);
+            Ok(url)
+        }
+        Err(e) => {
+            log::error!("无法打开 Git 仓库: {}, 错误: {}", path, e);
+            Err(format!("无法打开 Git 仓库: {}", e))
+        }
+    }
+}
+
+/// 在文件管理器中打开指定文件夹
+#[command]
+pub async fn open_folder(path: String) -> Result<(), String> {
+    log::debug!("打开文件夹: {}", path);
+
+    let folder_path = Path::new(&path);
+
+    // 检查路径是否存在
+    if !folder_path.exists() {
+        return Err(format!("路径不存在: {}", path));
+    }
+
+    // 使用系统默认程序打开文件夹
+    match open::that(&path) {
+        Ok(_) => {
+            log::info!("成功打开文件夹: {}", path);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("打开文件夹失败: {}, 错误: {}", path, e);
+            Err(format!("打开文件夹失败: {}", e))
+        }
+    }
+}
+
+// 内部辅助函数
+
+/// 获取远程 URL（内部函数）
+fn get_remote_url_internal(repo: &Repository) -> Option<String> {
+    // 尝试获取 origin 远程
+    match repo.find_remote("origin") {
+        Ok(remote) => {
+            if let Some(url) = remote.url() {
+                return Some(url.to_string());
+            }
+        }
+        Err(_) => {
+            // 如果没有 origin，尝试获取第一个远程
+            if let Ok(remotes) = repo.remotes() {
+                for remote_name in remotes.iter() {
+                    if let Some(name) = remote_name {
+                        if let Ok(remote) = repo.find_remote(name) {
+                            if let Some(url) = remote.url() {
+                                return Some(url.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 获取当前分支（内部函数）
+fn get_current_branch_internal(repo: &Repository) -> Option<String> {
+    match repo.head() {
+        Ok(head) => {
+            if let Some(branch_name) = head.shorthand() {
+                return Some(branch_name.to_string());
+            }
+        }
+        Err(_) => {
+            // 如果无法获取 HEAD，尝试获取默认分支
+            if let Ok(branches) = repo.branches(Some(git2::BranchType::Local)) {
+                for branch_result in branches {
+                    if let Ok((branch, _)) = branch_result {
+                        if let Some(name) = branch.name().unwrap_or(None) {
+                            return Some(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
