@@ -13,7 +13,7 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-  breaks: true
+  breaks: false // 禁用自动换行，避免徽章链接换行
 });
 
 // 自定义代码块渲染
@@ -65,7 +65,7 @@ md.renderer.rules.link_open = function (tokens, idx, options) {
 };
 
 // 自定义图片渲染（处理相对路径）
-md.renderer.rules.image = function (tokens, idx, options, renderer) {
+md.renderer.rules.image = function (tokens, idx, options) {
   const token = tokens[idx];
   const srcIndex = token.attrIndex('src');
 
@@ -79,8 +79,49 @@ md.renderer.rules.image = function (tokens, idx, options, renderer) {
     }
   }
 
-  token.attrSet('class', 'max-w-full h-auto rounded border');
+  token.attrSet('class', 'max-w-full h-auto rounded border inline-block');
   token.attrSet('loading', 'lazy');
+
+  return md.renderer.renderToken(tokens, idx, options);
+};
+
+// 自定义段落渲染器，处理徽章链接不换行
+md.renderer.rules.paragraph_open = function (tokens, idx, options, _env, renderer) {
+  const token = tokens[idx];
+
+  // 检查段落内容是否包含多个徽章链接
+  let nextTokenIdx = idx + 1;
+  let badgeCount = 0;
+  let hasOnlyBadges = true;
+
+  // 查找段落内的所有 token
+  while (nextTokenIdx < tokens.length && tokens[nextTokenIdx].type !== 'paragraph_close') {
+    const nextToken = tokens[nextTokenIdx];
+
+    if (nextToken.type === 'inline') {
+      const inlineContent = nextToken.content;
+      // 检测徽章链接模式：[![...](https://img.shields.io/...)](...)
+      const badgePattern = /\[!\[.*?\]\(https:\/\/img\.shields\.io\/.*?\)\]\(.*?\)/g;
+      const badges = inlineContent.match(badgePattern);
+
+      if (badges) {
+        badgeCount += badges.length;
+        // 检查是否只包含徽章和空白字符
+        const contentWithoutBadges = inlineContent.replace(badgePattern, '').trim();
+        if (contentWithoutBadges.length > 0) {
+          hasOnlyBadges = false;
+        }
+      } else if (inlineContent.trim().length > 0) {
+        hasOnlyBadges = false;
+      }
+    }
+    nextTokenIdx++;
+  }
+
+  // 如果段落只包含多个徽章链接，添加特殊的 CSS 类
+  if (badgeCount > 1 && hasOnlyBadges) {
+    token.attrSet('class', 'badge-container');
+  }
 
   return renderer.renderToken(tokens, idx, options);
 };
@@ -89,8 +130,12 @@ md.renderer.rules.image = function (tokens, idx, options, renderer) {
 function decodeBase64Utf8(base64: string): string {
   try {
     const binary = atob(base64);
-    // 转成 UTF-8 字符串
-    return decodeURIComponent(escape(binary));
+    // 转成 UTF-8 字符串，使用现代方法替代已弃用的 escape
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
   } catch (e) {
     console.error('Base64 decode error:', e);
     return '';
@@ -115,11 +160,39 @@ const highlightAllCode = () => {
   highlightAll();
 };
 
-// 组件挂载后高亮代码
+// 处理徽章段落，防止换行
+const processBadgeParagraphs = () => {
+  const readmeElement = document.getElementById('readme-content');
+  if (!readmeElement) return;
+
+  const paragraphs = readmeElement.querySelectorAll('p');
+
+  paragraphs.forEach(p => {
+    const links = p.querySelectorAll('a');
+    const badgeLinks = Array.from(links).filter(link => {
+      const img = link.querySelector('img');
+      return img && img.src && img.src.includes('img.shields.io');
+    });
+
+    // 如果段落只包含徽章链接和空白字符
+    if (badgeLinks.length > 0) {
+      const textContent = p.textContent?.trim() || '';
+      const hasOnlyBadges = textContent.length === 0 ||
+        textContent.split('').every(char => /\s/.test(char));
+
+      if (hasOnlyBadges && badgeLinks.length > 1) {
+        p.classList.add('badges-only');
+      }
+    }
+  });
+};
+
+// 组件挂载后高亮代码和处理徽章
 onMounted(() => {
   // 延迟执行以确保 DOM 已更新
   setTimeout(() => {
     highlightAllCode();
+    processBadgeParagraphs();
   }, 100);
 });
 
@@ -131,6 +204,7 @@ onMounted(() => {
   if (readmeElement) {
     observer.value = new MutationObserver(() => {
       highlightAllCode();
+      processBadgeParagraphs();
     });
 
     observer.value.observe(readmeElement, {
@@ -354,6 +428,51 @@ export { formatFileSize };
   border: none;
   border-top: 1px solid hsl(var(--border));
   margin: 2rem 0;
+}
+
+/* 徽章容器样式 - 防止换行 */
+.readme-content :deep(.badge-container) {
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.readme-content :deep(.badge-container a) {
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.readme-content :deep(.badge-container img) {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0;
+  border: none;
+  border-radius: 0.25rem;
+}
+
+/* 针对徽章段落的特殊处理 */
+.readme-content :deep(p.badges-only) {
+  white-space: nowrap;
+  overflow-x: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  padding: 0.25rem 0;
+}
+
+/* 徽章图片样式优化 */
+.readme-content :deep(img[src*="img.shields.io"]) {
+  display: inline-block !important;
+  margin: 0 0.25rem 0 0 !important;
+  border: none !important;
+  border-radius: 0.25rem !important;
+  vertical-align: middle !important;
+  max-height: 20px !important;
 }
 
 /* 代码高亮样式 */

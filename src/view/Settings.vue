@@ -18,13 +18,13 @@ const {
 const themeOptions = [
   {
     value: 'light' as ThemeMode,
-    label: '亮色主题',
+    label: 'light',
     description: '适合白天使用的明亮界面',
     icon: '☀️'
   },
   {
     value: 'dark' as ThemeMode,
-    label: '暗色主题',
+    label: 'dark',
     description: '适合夜间使用的深色界面',
     icon: '🌙'
   }
