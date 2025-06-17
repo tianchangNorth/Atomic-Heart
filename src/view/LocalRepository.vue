@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLocalRepositories } from '@/composables/useLocalRepositories';
 import type { LocalRepository } from '@/types/local-repository';
+import { extractRepositoryName } from '@/utils/utils'
 import RepoClone from '@/components/git/RepoClone.vue';
 import { open } from '@tauri-apps/plugin-dialog';
 
@@ -162,76 +163,6 @@ const handleCloneSuccess = async (result: any) => {
     }
   } catch (error) {
     console.error('处理克隆成功事件时出错:', error);
-  }
-};
-
-// 从 Git URL 中提取仓库名称
-const extractRepositoryName = (url: string): string => {
-  try {
-    if (!url || url.trim().length === 0) {
-      return 'Unknown Repository';
-    }
-
-    console.log('正在提取仓库名称，URL:', url); // 调试日志
-
-    let repoName = url.trim();
-
-    // 处理各种 Git URL 格式
-    // https://github.com/user/repo.git
-    // git@github.com:user/repo.git
-    // https://github.com/user/repo
-    // https://gitlab.com/user/repo.git
-
-    // 移除 .git 后缀
-    if (repoName.endsWith('.git')) {
-      repoName = repoName.slice(0, -4);
-    }
-
-    // 处理 SSH 格式 (git@host:user/repo)
-    if (repoName.includes('@') && repoName.includes(':')) {
-      const sshMatch = repoName.match(/@[^:]+:(.+)$/);
-      if (sshMatch) {
-        repoName = sshMatch[1];
-      }
-    }
-
-    // 处理 HTTPS 格式，移除协议和主机部分
-    if (repoName.startsWith('http://') || repoName.startsWith('https://')) {
-      try {
-        const urlObj = new URL(repoName);
-        repoName = urlObj.pathname;
-      } catch (e) {
-        // 如果 URL 解析失败，使用简单的字符串处理
-        const protocolIndex = repoName.indexOf('://');
-        if (protocolIndex !== -1) {
-          repoName = repoName.substring(protocolIndex + 3);
-          const slashIndex = repoName.indexOf('/');
-          if (slashIndex !== -1) {
-            repoName = repoName.substring(slashIndex);
-          }
-        }
-      }
-    }
-
-    // 移除开头的斜杠
-    if (repoName.startsWith('/')) {
-      repoName = repoName.substring(1);
-    }
-
-    // 提取最后一部分作为仓库名
-    const parts = repoName.split('/');
-    repoName = parts[parts.length - 1];
-
-    // 清理特殊字符
-    repoName = repoName.replace(/[^\w\-_.]/g, '');
-
-    const finalName = repoName || 'Unknown Repository';
-    console.log('提取的仓库名称:', finalName); // 调试日志
-
-    return finalName;
-  } catch (error) {
-    console.error('提取仓库名称失败:', error, 'URL:', url);
-    return 'Unknown Repository';
   }
 };
 

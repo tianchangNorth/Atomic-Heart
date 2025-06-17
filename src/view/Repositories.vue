@@ -9,6 +9,8 @@ import { $fetch } from '@/utils/fetch';
 import { useUserStore } from '@/stores/index';
 import RepoClone from '@/components/git/RepoClone.vue';
 import { getToken } from '@/utils/token';
+import { useLocalRepositories } from '@/composables/useLocalRepositories';
+import { extractRepositoryName } from '@/utils/utils'
 
 // 定义仓库数据接口
 interface Repository {
@@ -44,6 +46,9 @@ const filterBy = ref('all');
 // 克隆相关状态
 const showCloneDialog = ref(false);
 const selectedRepoForClone = ref<Repository | null>(null);
+
+// 使用本地仓库管理
+const { addRepository } = useLocalRepositories();
 
 // 获取仓库数据
 const fetchRepositories = async () => {
@@ -197,8 +202,35 @@ const handleViewRepo = (repo: Repository) => {
 const handleCreateRepo = () => {
   // 跳转到创建仓库页面
   console.log('创建新仓库');
-  // 这里可以添加路由跳转逻辑
-  // router.push('/repos/new');
+};
+
+const handleCloneSuccess = async (result: any) => {
+  try {
+    if (result.success && result.repository_path) {
+      // 从 URL 中提取仓库名称
+      const repoUrl = result.repository_url || '';
+      const repoName = extractRepositoryName(repoUrl);
+
+      // 添加到本地仓库列表
+      const addResult = await addRepository({
+        name: repoName,
+        path: result.repository_path,
+        remoteUrl: repoUrl || undefined,
+        currentBranch: result.branch || undefined
+      });
+
+      if (addResult.success) {
+        // 关闭克隆对话框
+        // showCloneDialog.value = false;
+      } else {
+        console.error('添加仓库到本地列表失败:', addResult.message);
+      }
+    } else {
+      console.warn('克隆成功但缺少必要信息:', result);
+    }
+  } catch (error) {
+    console.error('处理克隆成功事件时出错:', error);
+  }
 };
 
 const clearSearch = () => {
@@ -501,6 +533,7 @@ onMounted(() => {
             :initial-url="getCloneConfig.url"
             :initial-directory="getCloneConfig.suggestedDirectory"
             :initial-auth-config="getCloneConfig.authConfig"
+            @cloneSuccess="handleCloneSuccess"
           />
         </div>
       </div>

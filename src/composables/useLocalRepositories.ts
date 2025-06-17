@@ -152,14 +152,6 @@ export const useLocalRepositories = () => {
       const remoteUrl = repoValidation.info?.remote_url || params.remoteUrl?.trim() || undefined;
       const currentBranch = repoValidation.info?.current_branch || params.currentBranch?.trim() || undefined;
 
-      console.log('仓库验证结果:', {
-        isValid: repoValidation.isValid,
-        status: repoValidation.status,
-        name: repoName,
-        remoteUrl,
-        currentBranch
-      });
-
       const newRepository: LocalRepository = {
         id: generateId(),
         name: repoName,
