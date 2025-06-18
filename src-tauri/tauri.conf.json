@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "AtomDesk",
-        "width": 1400,
-        "height": 1000,
+        "width": 1440,
+        "height": 900,
         "devtools": true
       }
     ],
