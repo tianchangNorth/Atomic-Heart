@@ -24,7 +24,11 @@ interface Activity {
     web_url: string;
   };
   created_at: string;
-  payload: string;
+  payload: {
+    title?: string;
+    id?: string;
+    iid?:string;
+  };
 }
 
 const userStore = useUserStore();
@@ -138,8 +142,10 @@ const getActivityDescription = (activity: Activity): string => {
       return `为 ${repo.name} 发布了新版本`;
     case 'star':
       return `给 ${repo.name} 点了星标`;
+    case 'merge_created':
+      return `合并了 ${payload.title} 到 ${repo.name}`;
     default:
-      return payload || `在 ${repo.name} 中进行了操作`;
+      return payload.title || `在 ${repo.name} 中进行了操作`;
   }
 };
 

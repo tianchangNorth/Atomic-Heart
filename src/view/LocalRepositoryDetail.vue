@@ -295,7 +295,7 @@ onMounted(() => {
           </TabsContent>
 
           <TabsContent value="commits">
-            <CommitManager />
+            <CommitManager :repository-path="repository?.path || ''" />
           </TabsContent>
 
           <TabsContent value="sync">

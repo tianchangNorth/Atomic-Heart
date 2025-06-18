@@ -1,4 +1,7 @@
-use crate::git::{AuthConfig, AuthManager, CloneManager, CloneOptions, CloneResult};
+use crate::git::{
+    AuthConfig, AuthManager, CloneManager, CloneOptions, CloneResult, CommitHistoryItem,
+    RepositoryStatus,
+};
 use git2::Repository;
 use std::collections::HashMap;
 use std::path::Path;
@@ -497,4 +500,127 @@ fn get_current_branch_internal(repo: &Repository) -> Option<String> {
         }
     }
     None
+}
+
+/// 获取仓库状态
+#[command]
+pub async fn get_repository_status(repo_path: String) -> Result<RepositoryStatus, String> {
+    log::debug!("获取仓库状态: {}", repo_path);
+
+    match crate::git::operations::get_repository_status(&repo_path) {
+        Ok(status) => Ok(status),
+        Err(e) => {
+            log::error!("获取仓库状态失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 暂存文件
+#[command]
+pub async fn stage_files(repo_path: String, file_paths: Vec<String>) -> Result<(), String> {
+    log::debug!("暂存文件: {:?} in {}", file_paths, repo_path);
+
+    match crate::git::operations::stage_files(&repo_path, &file_paths) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            log::error!("暂存文件失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 取消暂存文件
+#[command]
+pub async fn unstage_files(repo_path: String, file_paths: Vec<String>) -> Result<(), String> {
+    log::debug!("取消暂存文件: {:?} in {}", file_paths, repo_path);
+
+    match crate::git::operations::unstage_files(&repo_path, &file_paths) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            log::error!("取消暂存文件失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 创建提交
+#[command]
+pub async fn create_commit(
+    repo_path: String,
+    message: String,
+    description: Option<String>,
+    author_name: Option<String>,
+    author_email: Option<String>,
+    amend: Option<bool>,
+    signoff: Option<bool>,
+) -> Result<String, String> {
+    log::debug!("创建提交: {} in {}", message, repo_path);
+
+    let commit_options = crate::git::types::CommitOptions {
+        message,
+        description,
+        author_name,
+        author_email,
+        amend: amend.unwrap_or(false),
+        signoff: signoff.unwrap_or(false),
+    };
+
+    match crate::git::operations::create_commit(&repo_path, &commit_options) {
+        Ok(commit_sha) => Ok(commit_sha),
+        Err(e) => {
+            log::error!("创建提交失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 获取提交历史
+#[command]
+pub async fn get_commit_history(
+    repo_path: String,
+    limit: Option<usize>,
+    skip: Option<usize>,
+) -> Result<Vec<CommitHistoryItem>, String> {
+    log::debug!(
+        "获取提交历史: {} (limit: {:?}, skip: {:?})",
+        repo_path,
+        limit,
+        skip
+    );
+
+    match crate::git::operations::get_commit_history(
+        &repo_path,
+        limit.unwrap_or(50),
+        skip.unwrap_or(0),
+    ) {
+        Ok(commits) => Ok(commits),
+        Err(e) => {
+            log::error!("获取提交历史失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 获取文件差异
+#[command]
+pub async fn get_file_diff(
+    repo_path: String,
+    file_path: String,
+    staged: Option<bool>,
+) -> Result<String, String> {
+    log::debug!(
+        "获取文件差异: {} in {} (staged: {:?})",
+        file_path,
+        repo_path,
+        staged
+    );
+
+    match crate::git::operations::get_file_diff(&repo_path, &file_path, staged.unwrap_or(false)) {
+        Ok(diff) => Ok(diff),
+        Err(e) => {
+            log::error!("获取文件差异失败: {}", e);
+            Err(e.to_string())
+        }
+    }
 }

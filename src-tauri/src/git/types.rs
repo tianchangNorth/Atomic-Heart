@@ -211,3 +211,73 @@ pub struct RepositoryInfo {
     /// 最后更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
+
+/// 仓库状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepositoryStatus {
+    /// 当前分支
+    pub current_branch: String,
+    /// 文件状态列表
+    pub files: Vec<FileStatus>,
+    /// 领先提交数
+    pub ahead: u32,
+    /// 落后提交数
+    pub behind: u32,
+    /// 是否干净（无变更）
+    pub is_clean: bool,
+}
+
+/// 文件状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileStatus {
+    /// 文件路径
+    pub path: String,
+    /// 状态类型
+    pub status: String,
+    /// 是否已暂存
+    pub staged: bool,
+    /// 新增行数
+    pub additions: u32,
+    /// 删除行数
+    pub deletions: u32,
+}
+
+/// 提交选项
+#[derive(Debug, Clone)]
+pub struct CommitOptions {
+    /// 提交消息
+    pub message: String,
+    /// 详细描述
+    pub description: Option<String>,
+    /// 作者姓名
+    pub author_name: Option<String>,
+    /// 作者邮箱
+    pub author_email: Option<String>,
+    /// 是否修正上次提交
+    pub amend: bool,
+    /// 是否添加签名
+    pub signoff: bool,
+}
+
+/// 提交历史项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitHistoryItem {
+    /// 提交SHA
+    pub sha: String,
+    /// 提交消息
+    pub message: String,
+    /// 作者姓名
+    pub author_name: String,
+    /// 作者邮箱
+    pub author_email: String,
+    /// 作者时间戳
+    pub author_date: i64,
+    /// 提交者姓名
+    pub committer_name: String,
+    /// 提交者邮箱
+    pub committer_email: String,
+    /// 提交者时间戳
+    pub committer_date: i64,
+    /// 父提交数量
+    pub parent_count: usize,
+}

@@ -1,118 +1,86 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Textarea from '@/components/ui/textarea/Textarea.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/toast';
+import { useGitOperations } from '@/composables/useGitOperations';
 import DiffViewer from './ui/DiffViewer.vue';
-import type { FileChange, CommitInfo } from '@/types/git';
+import { RefreshCw, Loader2 } from 'lucide-vue-next';
 
-// 模拟文件变更数据
-const fileChanges = ref<FileChange[]>([
-  {
-    path: 'src/components/git/CommitManager.vue',
-    status: 'modified',
-    staged: false,
-    additions: 45,
-    deletions: 12,
-    diff: `@@ -1,10 +1,15 @@
- <script setup lang="ts">
- import { ref, computed, reactive } from 'vue';
-+import { Button } from '@/components/ui/button';
-+import { Input } from '@/components/ui/input';
- import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
- 
- // 组件状态
--const isLoading = ref(false);
-+const isCommitting = ref(false);
-+const selectedFile = ref<string | null>(null);
- 
- // 计算属性
--const canCommit = computed(() => !isLoading.value);
-+const canCommit = computed(() => {
-+  return !isCommitting.value && stagedFiles.value.length > 0;
-+});`
-  },
-  {
-    path: 'src/types/git.ts',
-    status: 'added',
-    staged: true,
-    additions: 25,
-    deletions: 0,
-    diff: `@@ -0,0 +1,25 @@
-+// Git 操作相关类型
-+export interface FileChange {
-+  path: string;
-+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
-+  staged: boolean;
-+  oldPath?: string;
-+  additions: number;
-+  deletions: number;
-+  content?: string;
-+  diff?: string;
-+}
-+
-+export interface CommitInfo {
-+  message: string;
-+  description?: string;
-+  author?: {
-+    name: string;
-+    email: string;
-+  };
-+  amend?: boolean;
-+  signoff?: boolean;
-+}`
-  },
-  {
-    path: 'README.md',
-    status: 'deleted',
-    staged: false,
-    additions: 0,
-    deletions: 15,
-    diff: `@@ -1,15 +0,0 @@
--# AtomDesk
--
--A modern Git repository management application.
--
--## Features
--
--- Repository cloning
--- Commit management
--- Branch operations
--- Sync operations
--
--## Installation
--
--\`\`\`bash
--npm install`
-  },
-  {
-    path: 'package.json',
-    status: 'untracked',
-    staged: false,
-    additions: 8,
-    deletions: 0,
-    diff: ''
-  }
-]);
+// Props
+interface Props {
+  repositoryPath: string;
+}
 
+const props = defineProps<Props>();
+
+// Composables
+const { success } = useToast();
+const {
+  repositoryStatus,
+  stagedFiles,
+  unstagedFiles,
+  // hasChanges,
+  hasStagedChanges,
+  // isClean,
+  statusState,
+  stageState,
+  commitState,
+  refreshStatus,
+  stageFile,
+  unstageFile,
+  stageAllFiles,
+  unstageAllFiles,
+  createCommit,
+  getFileDiff,
+  initialize
+} = useGitOperations(props.repositoryPath);
+
+// 响应式数据
 const selectedFile = ref<string | null>(null);
-const commitForm = reactive<CommitInfo>({
+const selectedFileDiff = ref<string>('');
+const loadingDiff = ref(false);
+
+const commitForm = reactive({
   message: '',
   description: '',
   amend: false,
   signoff: false
 });
 
-const isCommitting = ref(false);
+// 监听仓库路径变化
+watch(() => props.repositoryPath, async (newPath) => {
+  if (newPath) {
+    await initialize();
+  }
+}, { immediate: true });
+
+// 监听选中文件变化，加载差异
+watch(selectedFile, async (newFile) => {
+  if (newFile && repositoryStatus.value) {
+    loadingDiff.value = true;
+    try {
+      const file = repositoryStatus.value.files.find(f => f.path === newFile);
+      if (file) {
+        selectedFileDiff.value = await getFileDiff(newFile, file.staged);
+      }
+    } catch (error) {
+      console.error('加载文件差异失败:', error);
+      selectedFileDiff.value = '';
+    } finally {
+      loadingDiff.value = false;
+    }
+  } else {
+    selectedFileDiff.value = '';
+  }
+});
 
 // 计算属性
-const stagedFiles = computed(() => fileChanges.value.filter(f => f.staged));
-const unstagedFiles = computed(() => fileChanges.value.filter(f => !f.staged));
-
 const canCommit = computed(() => {
-  return !isCommitting.value && stagedFiles.value.length > 0 && commitForm.message.trim();
+  return !commitState.value.loading && hasStagedChanges.value && commitForm.message.trim();
 });
 
 const totalAdditions = computed(() =>
@@ -123,8 +91,13 @@ const totalDeletions = computed(() =>
   stagedFiles.value.reduce((sum, file) => sum + file.deletions, 0)
 );
 
+const selectedFileData = computed(() => {
+  if (!selectedFile.value || !repositoryStatus.value) return null;
+  return repositoryStatus.value.files.find(f => f.path === selectedFile.value);
+});
+
 // 获取文件状态样式
-const getStatusBadge = (status: FileChange['status']) => {
+const getStatusBadge = (status: string) => {
   const statusConfig = {
     added: { variant: 'default' as const, color: 'text-green-600', label: '新增' },
     modified: { variant: 'secondary' as const, color: 'text-blue-600', label: '修改' },
@@ -133,7 +106,7 @@ const getStatusBadge = (status: FileChange['status']) => {
     untracked: { variant: 'outline' as const, color: 'text-gray-600', label: '未跟踪' }
   };
 
-  return statusConfig[status] || statusConfig.modified;
+  return statusConfig[status as keyof typeof statusConfig] || statusConfig.modified;
 };
 
 // 获取文件图标
@@ -153,50 +126,56 @@ const getFileIcon = (path: string) => {
 };
 
 // 方法
-const toggleStaged = (file: FileChange) => {
-  file.staged = !file.staged;
-};
-
-const stageAll = () => {
-  unstagedFiles.value.forEach(file => {
-    file.staged = true;
-  });
-};
-
-const unstageAll = () => {
-  stagedFiles.value.forEach(file => {
-    file.staged = false;
-  });
+const toggleStaged = async (file: { path: string; staged: boolean }) => {
+  if (file.staged) {
+    await unstageFile(file.path);
+  } else {
+    await stageFile(file.path);
+  }
 };
 
 const selectFile = (filePath: string) => {
   selectedFile.value = selectedFile.value === filePath ? null : filePath;
 };
 
+const handleStageAll = async () => {
+  await stageAllFiles();
+};
+
+const handleUnstageAll = async () => {
+  await unstageAllFiles();
+};
+
+const handleRefresh = async () => {
+  await refreshStatus();
+  selectedFile.value = null;
+};
+
 const commit = async () => {
   if (!canCommit.value) return;
 
-  isCommitting.value = true;
+  try {
+    const commitSha = await createCommit({
+      message: commitForm.message,
+      description: commitForm.description || undefined,
+      amend: commitForm.amend,
+      signoff: commitForm.signoff
+    });
 
-  // 模拟提交过程
-  await new Promise(resolve => setTimeout(resolve, 2000));
+    if (commitSha) {
+      // 重置表单
+      commitForm.message = '';
+      commitForm.description = '';
+      commitForm.amend = false;
+      commitForm.signoff = false;
+      selectedFile.value = null;
 
-  // 重置表单和文件状态
-  commitForm.message = '';
-  commitForm.description = '';
-  commitForm.amend = false;
-  commitForm.signoff = false;
-
-  // 移除已暂存的文件
-  fileChanges.value = fileChanges.value.filter(f => !f.staged);
-  selectedFile.value = null;
-
-  isCommitting.value = false;
+      success(`提交 ${commitSha.slice(0, 7)} 已创建`, '提交成功');
+    }
+  } catch (error) {
+    console.error('提交失败:', error);
+  }
 };
-
-const selectedFileData = computed(() => {
-  return selectedFile.value ? fileChanges.value.find(f => f.path === selectedFile.value) : null;
-});
 </script>
 
 <template>
@@ -213,13 +192,31 @@ const selectedFileData = computed(() => {
               </svg>
               <span>暂存区</span>
               <Badge variant="secondary">{{ stagedFiles.length }}</Badge>
+              <Button
+                v-if="statusState.loading"
+                variant="ghost"
+                size="sm"
+                disabled
+              >
+                <Loader2 class="w-4 h-4 animate-spin" />
+              </Button>
+              <Button
+                v-else
+                variant="ghost"
+                size="sm"
+                @click="handleRefresh"
+              >
+                <RefreshCw class="w-4 h-4" />
+              </Button>
             </div>
-            <Button 
+            <Button
               v-if="stagedFiles.length > 0"
-              variant="ghost" 
-              size="sm" 
-              @click="unstageAll"
+              variant="ghost"
+              size="sm"
+              @click="handleUnstageAll"
+              :disabled="stageState.loading"
             >
+              <Loader2 v-if="stageState.loading" class="w-4 h-4 animate-spin mr-2" />
               全部取消暂存
             </Button>
           </CardTitle>
@@ -278,12 +275,14 @@ const selectedFileData = computed(() => {
               <span>工作区变更</span>
               <Badge variant="outline">{{ unstagedFiles.length }}</Badge>
             </div>
-            <Button 
+            <Button
               v-if="unstagedFiles.length > 0"
-              variant="ghost" 
-              size="sm" 
-              @click="stageAll"
+              variant="ghost"
+              size="sm"
+              @click="handleStageAll"
+              :disabled="stageState.loading"
             >
+              <Loader2 v-if="stageState.loading" class="w-4 h-4 animate-spin mr-2" />
               全部暂存
             </Button>
           </CardTitle>
@@ -384,18 +383,16 @@ const selectedFileData = computed(() => {
             </div>
           </div>
 
-          <Button 
-            @click="commit" 
+          <Button
+            @click="commit"
             :disabled="!canCommit"
             class="w-full"
           >
-            <svg v-if="isCommitting" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+            <Loader2 v-if="commitState.loading" class="w-4 h-4 mr-2 animate-spin" />
             <svg v-else class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h6m-6 0l-1 1v4a2 2 0 002 2h2m2-6h2a2 2 0 012 2v4a2 2 0 01-2 2h-2m-2-6v6m-2-6v6"/>
             </svg>
-            {{ isCommitting ? '提交中...' : '提交变更' }}
+            {{ commitState.loading ? '提交中...' : '提交变更' }}
           </Button>
         </CardContent>
       </Card>
@@ -403,10 +400,17 @@ const selectedFileData = computed(() => {
 
     <!-- 右侧：差异预览 -->
     <div class="flex flex-col min-h-[600px]">
-      <div v-if="selectedFileData" class="flex-1">
+      <div v-if="loadingDiff" class="flex-1 flex items-center justify-center">
+        <div class="text-center">
+          <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
+          <p class="text-sm text-muted-foreground">加载文件差异...</p>
+        </div>
+      </div>
+
+      <div v-else-if="selectedFileData && selectedFileDiff" class="flex-1">
         <DiffViewer
           :file-name="selectedFileData.path"
-          :diff="selectedFileData.diff"
+          :diff="selectedFileDiff"
           :additions="selectedFileData.additions"
           :deletions="selectedFileData.deletions"
           max-height="600px"
