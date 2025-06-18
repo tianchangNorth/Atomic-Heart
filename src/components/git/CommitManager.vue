@@ -5,10 +5,21 @@ import { Input } from '@/components/ui/input';
 import Textarea from '@/components/ui/textarea/Textarea.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { useGitOperations } from '@/composables/useGitOperations';
 import DiffViewer from './ui/DiffViewer.vue';
-import { RefreshCw, Loader2 } from 'lucide-vue-next';
+import {
+  RefreshCw,
+  Loader2,
+  CheckCircle2,
+  FileText,
+  GitCommit,
+  Plus,
+  Minus,
+  Archive,
+  FolderOpen
+} from 'lucide-vue-next';
 
 // Props
 interface Props {
@@ -50,6 +61,9 @@ const commitForm = reactive({
   amend: false,
   signoff: false
 });
+
+// 提交对话框状态
+const showCommitDialog = ref(false);
 
 // 监听仓库路径变化
 watch(() => props.repositoryPath, async (newPath) => {
@@ -109,22 +123,6 @@ const getStatusBadge = (status: string) => {
   return statusConfig[status as keyof typeof statusConfig] || statusConfig.modified;
 };
 
-// 获取文件图标
-const getFileIcon = (path: string) => {
-  const ext = path.split('.').pop()?.toLowerCase();
-  const iconMap: Record<string, string> = {
-    vue: 'text-green-500',
-    ts: 'text-blue-500',
-    js: 'text-yellow-500',
-    json: 'text-orange-500',
-    md: 'text-gray-600',
-    css: 'text-pink-500',
-    html: 'text-red-500'
-  };
-
-  return iconMap[ext || ''] || 'text-gray-500';
-};
-
 // 方法
 const toggleStaged = async (file: { path: string; staged: boolean }) => {
   if (file.staged) {
@@ -151,6 +149,23 @@ const handleRefresh = async () => {
   selectedFile.value = null;
 };
 
+// 打开提交对话框
+const openCommitDialog = () => {
+  if (!hasStagedChanges.value) return;
+  showCommitDialog.value = true;
+};
+
+// 关闭提交对话框
+const closeCommitDialog = () => {
+  showCommitDialog.value = false;
+  // 重置表单
+  commitForm.message = '';
+  commitForm.description = '';
+  commitForm.amend = false;
+  commitForm.signoff = false;
+};
+
+// 执行提交
 const commit = async () => {
   if (!canCommit.value) return;
 
@@ -163,11 +178,8 @@ const commit = async () => {
     });
 
     if (commitSha) {
-      // 重置表单
-      commitForm.message = '';
-      commitForm.description = '';
-      commitForm.amend = false;
-      commitForm.signoff = false;
+      // 关闭对话框并重置表单
+      closeCommitDialog();
       selectedFile.value = null;
 
       success(`提交 ${commitSha.slice(0, 7)} 已创建`, '提交成功');
@@ -176,22 +188,27 @@ const commit = async () => {
     console.error('提交失败:', error);
   }
 };
+
+// 处理键盘快捷键
+const handleCommitKeydown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault();
+    commit();
+  }
+};
 </script>
 
 <template>
-  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 min-h-[600px]">
-    <!-- 左侧：文件变更列表和提交信息 -->
-    <div class="space-y-6">
-      <!-- 暂存区 -->
-      <Card>
+  <div class="flex h-full min-h-[600px] gap-6">
+    <div class="flex flex-col w-full max-w-md flex-shrink-0 space-y-4 left-panel">
+      <!-- 文件变更 -->
+      <Card class="gap-0">
         <CardHeader>
           <CardTitle class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              <span>暂存区</span>
-              <Badge variant="secondary">{{ stagedFiles.length }}</Badge>
+              <FileText class="w-5 h-5" />
+              <span>文件变更</span>
+              <Badge variant="secondary">{{ (repositoryStatus?.files.length || 0) }}</Badge>
               <Button
                 v-if="statusState.loading"
                 variant="ghost"
@@ -209,159 +226,214 @@ const commit = async () => {
                 <RefreshCw class="w-4 h-4" />
               </Button>
             </div>
-            <Button
-              v-if="stagedFiles.length > 0"
-              variant="ghost"
-              size="sm"
-              @click="handleUnstageAll"
-              :disabled="stageState.loading"
-            >
-              <Loader2 v-if="stageState.loading" class="w-4 h-4 animate-spin mr-2" />
-              全部取消暂存
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="stagedFiles.length === 0" class="text-center py-8 text-muted-foreground">
-            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H7"/>
-            </svg>
-            <p>暂存区为空</p>
-            <p class="text-sm">选择下方文件进行暂存</p>
-          </div>
-          
-          <div v-else class="space-y-2">
-            <div
-              v-for="file in stagedFiles"
-              :key="file.path"
-              class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer"
-              :class="{ 'bg-accent': selectedFile === file.path }"
-              @click="selectFile(file.path)"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <svg class="w-4 h-4 flex-shrink-0" :class="getFileIcon(file.path)" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14,2 14,8 20,8"/>
-                </svg>
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium truncate">{{ file.path }}</p>
-                  <div class="flex items-center space-x-2 mt-1">
-                    <Badge :variant="getStatusBadge(file.status).variant" class="text-xs">
-                      {{ getStatusBadge(file.status).label }}
-                    </Badge>
-                    <span class="text-xs text-green-600">+{{ file.additions }}</span>
-                    <span class="text-xs text-red-600">-{{ file.deletions }}</span>
-                  </div>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
-                </svg>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- 工作区 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              <span>工作区变更</span>
-              <Badge variant="outline">{{ unstagedFiles.length }}</Badge>
-            </div>
-            <Button
-              v-if="unstagedFiles.length > 0"
-              variant="ghost"
-              size="sm"
-              @click="handleStageAll"
-              :disabled="stageState.loading"
-            >
-              <Loader2 v-if="stageState.loading" class="w-4 h-4 animate-spin mr-2" />
-              全部暂存
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div v-if="unstagedFiles.length === 0" class="text-center py-8 text-muted-foreground">
-            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <p>工作区干净</p>
-            <p class="text-sm">没有未暂存的变更</p>
-          </div>
-          
-          <div v-else class="space-y-2">
-            <div
-              v-for="file in unstagedFiles"
-              :key="file.path"
-              class="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer"
-              :class="{ 'bg-accent': selectedFile === file.path }"
-              @click="selectFile(file.path)"
-            >
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <svg class="w-4 h-4 flex-shrink-0" :class="getFileIcon(file.path)" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14,2 14,8 20,8"/>
-                </svg>
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium truncate">{{ file.path }}</p>
-                  <div class="flex items-center space-x-2 mt-1">
-                    <Badge :variant="getStatusBadge(file.status).variant" class="text-xs">
-                      {{ getStatusBadge(file.status).label }}
-                    </Badge>
-                    <span class="text-xs text-green-600">+{{ file.additions }}</span>
-                    <span class="text-xs text-red-600">-{{ file.deletions }}</span>
-                  </div>
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- 提交信息 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h6m-6 0l-1 1v4a2 2 0 002 2h2m2-6h2a2 2 0 012 2v4a2 2 0 01-2 2h-2m-2-6v6m-2-6v6"/>
-            </svg>
-            <span>提交信息</span>
           </CardTitle>
         </CardHeader>
         <CardContent class="space-y-4">
+          <!-- 暂存区部分 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <CheckCircle2 class="w-4 h-4" />
+                <span class="text-sm font-medium">暂存区</span>
+                <Badge variant="secondary" class="text-xs">{{ stagedFiles.length }}</Badge>
+              </div>
+              <Button
+                v-if="stagedFiles.length > 0"
+                variant="ghost"
+                size="sm"
+                @click="handleUnstageAll"
+                :disabled="stageState.loading"
+              >
+                <Loader2 v-if="stageState.loading" class="w-3 h-3 animate-spin mr-1" />
+                <span class="text-xs">全部取消暂存</span>
+              </Button>
+            </div>
+
+            <div v-if="stagedFiles.length === 0" class="text-center py-4 text-muted-foreground">
+              <Archive class="w-8 h-8 mx-auto mb-1" />
+              <p class="text-xs">暂存区为空</p>
+            </div>
+
+            <div v-else class="space-y-1">
+              <div
+                v-for="file in stagedFiles"
+                :key="'staged-' + file.path"
+                class="flex items-center justify-between p-2 rounded border hover:bg-accent cursor-pointer"
+                :class="{ 'bg-accent': selectedFile === file.path }"
+                @click="selectFile(file.path)"
+              >
+                <div class="flex items-center space-x-2 flex-1 min-w-0">
+                  <FileText class="w-3 h-3 flex-shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium truncate">{{ file.path }}</p>
+                    <div class="flex items-center space-x-1 mt-0.5">
+                      <Badge :variant="getStatusBadge(file.status).variant" class="text-xs px-1 py-0">
+                        {{ getStatusBadge(file.status).label }}
+                      </Badge>
+                      <span class="text-xs text-green-600">+{{ file.additions }}</span>
+                      <span class="text-xs text-red-600">-{{ file.deletions }}</span>
+                    </div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)" class="h-6 w-6 p-0">
+                  <Minus class="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 工作区部分 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <FolderOpen class="w-4 h-4" />
+                <span class="text-sm font-medium">工作区变更</span>
+                <Badge variant="outline" class="text-xs">{{ unstagedFiles.length }}</Badge>
+              </div>
+              <Button
+                v-if="unstagedFiles.length > 0"
+                variant="ghost"
+                size="sm"
+                @click="handleStageAll"
+                :disabled="stageState.loading"
+              >
+                <Loader2 v-if="stageState.loading" class="w-3 h-3 animate-spin mr-1" />
+                <span class="text-xs">全部暂存</span>
+              </Button>
+            </div>
+
+            <div v-if="unstagedFiles.length === 0" class="text-center py-4 text-muted-foreground">
+              <CheckCircle2 class="w-8 h-8 mx-auto mb-1" />
+              <p class="text-xs">工作区干净</p>
+            </div>
+
+            <div v-else class="space-y-1">
+              <div
+                v-for="file in unstagedFiles"
+                :key="'unstaged-' + file.path"
+                class="flex items-center justify-between p-2 rounded border hover:bg-accent cursor-pointer"
+                :class="{ 'bg-accent': selectedFile === file.path }"
+                @click="selectFile(file.path)"
+              >
+                <div class="flex items-center space-x-2 flex-1 min-w-0">
+                  <FileText class="w-3 h-3 flex-shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium truncate">{{ file.path }}</p>
+                    <div class="flex items-center space-x-1 mt-0.5">
+                      <Badge :variant="getStatusBadge(file.status).variant" class="text-xs px-1 py-0">
+                        {{ getStatusBadge(file.status).label }}
+                      </Badge>
+                      <span class="text-xs text-green-600">+{{ file.additions }}</span>
+                      <span class="text-xs text-red-600">-{{ file.deletions }}</span>
+                    </div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)" class="h-6 w-6 p-0">
+                  <Plus class="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- 提交操作 -->
+      <div class="mt-4">
+        <Button
+          @click="openCommitDialog"
+          :disabled="!hasStagedChanges"
+          class="w-full"
+          variant="default"
+        >
+          <GitCommit class="w-4 h-4 mr-2" />
+          提交变更
+          <Badge v-if="stagedFiles.length > 0" variant="secondary" class="ml-2">
+            {{ stagedFiles.length }}
+          </Badge>
+        </Button>
+      </div>
+    </div>
+
+    <div class="flex-1 min-h-[400px] min-w-0 diff-viewer-container">
+        <!-- 差异内容区域 -->
+        <div class="bg-background min-h-[400px] diff-viewer-wrapper">
+          <div v-if="loadingDiff" class="flex items-center justify-center h-64 loading-state">
+            <div class="text-center">
+              <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
+              <p class="text-sm text-muted-foreground">加载文件差异...</p>
+            </div>
+          </div>
+
+          <div v-else-if="selectedFileData && selectedFileDiff" class="h-full">
+            <DiffViewer
+              :file-name="selectedFileData.path"
+              :diff="selectedFileDiff"
+              :additions="selectedFileData.additions"
+              :deletions="selectedFileData.deletions"
+              max-height="calc(100vh - 200px)"
+              class="diff-viewer w-full"
+            />
+          </div>
+
+          <div v-else class="flex items-center justify-center h-64">
+            <div class="text-center text-muted-foreground">
+              <FileText class="w-16 h-16 mx-auto mb-4 empty-state-icon" />
+              <p class="text-lg font-medium">选择文件查看差异</p>
+              <p class="text-sm">点击左侧文件列表中的文件来查看详细变更</p>
+            </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- 提交对话框 -->
+    <Dialog :open="showCommitDialog" @update:open="showCommitDialog = $event">
+      <DialogContent class="sm:max-w-md commit-dialog-content" @keydown="handleCommitKeydown">
+        <DialogHeader>
+          <DialogTitle class="flex items-center space-x-2">
+            <GitCommit class="w-5 h-5" />
+            <span>提交变更</span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div class="space-y-4 py-4">
+          <!-- 提交统计信息 -->
+          <div class="flex items-center justify-between p-3 commit-dialog-stats">
+            <div class="text-sm">
+              <span class="font-medium">{{ stagedFiles.length }}</span> 个文件将被提交
+            </div>
+            <div class="flex items-center space-x-4 text-sm diff-stats">
+              <span class="text-green-600">+{{ totalAdditions }}</span>
+              <span class="text-red-600">-{{ totalDeletions }}</span>
+            </div>
+          </div>
+
+          <!-- 提交标题 -->
           <div class="space-y-2">
             <label class="text-sm font-medium">提交标题 *</label>
             <Input
               v-model="commitForm.message"
               placeholder="简要描述本次提交的内容"
               maxlength="72"
+              class="text-sm"
+              @keydown.enter.prevent
             />
             <p class="text-xs text-muted-foreground">
               {{ commitForm.message.length }}/72 字符
             </p>
           </div>
 
+          <!-- 详细描述 -->
           <div class="space-y-2">
             <label class="text-sm font-medium">详细描述</label>
             <Textarea
               v-model="commitForm.description"
               placeholder="详细描述本次提交的变更内容（可选）"
               rows="3"
+              class="text-sm resize-none"
             />
           </div>
 
+          <!-- 选项 -->
           <div class="flex items-center space-x-4">
             <label class="flex items-center space-x-2">
               <input v-model="commitForm.amend" type="checkbox" class="rounded border-border">
@@ -372,82 +444,37 @@ const commit = async () => {
               <span class="text-sm">添加签名</span>
             </label>
           </div>
+        </div>
 
-          <div v-if="stagedFiles.length > 0" class="flex items-center justify-between p-3 bg-muted rounded-lg">
-            <div class="text-sm">
-              <span class="font-medium">{{ stagedFiles.length }}</span> 个文件将被提交
-            </div>
-            <div class="flex items-center space-x-4 text-sm">
-              <span class="text-green-600">+{{ totalAdditions }}</span>
-              <span class="text-red-600">-{{ totalDeletions }}</span>
-            </div>
+        <DialogFooter class="flex-col space-y-2">
+          <div class="flex justify-end space-x-2">
+            <Button variant="outline" @click="closeCommitDialog">
+              取消
+            </Button>
+            <Button
+              @click="commit"
+              :disabled="!canCommit"
+              class="min-w-[100px]"
+            >
+              <Loader2 v-if="commitState.loading" class="w-4 h-4 mr-2 animate-spin" />
+              <GitCommit v-else class="w-4 h-4 mr-2" />
+              {{ commitState.loading ? '提交中...' : '提交' }}
+            </Button>
           </div>
-
-          <Button
-            @click="commit"
-            :disabled="!canCommit"
-            class="w-full"
-          >
-            <Loader2 v-if="commitState.loading" class="w-4 h-4 mr-2 animate-spin" />
-            <svg v-else class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h6m-6 0l-1 1v4a2 2 0 002 2h2m2-6h2a2 2 0 012 2v4a2 2 0 01-2 2h-2m-2-6v6m-2-6v6"/>
-            </svg>
-            {{ commitState.loading ? '提交中...' : '提交变更' }}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-
-    <!-- 右侧：差异预览 -->
-    <div class="flex flex-col min-h-[600px]">
-      <div v-if="loadingDiff" class="flex-1 flex items-center justify-center">
-        <div class="text-center">
-          <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
-          <p class="text-sm text-muted-foreground">加载文件差异...</p>
-        </div>
-      </div>
-
-      <div v-else-if="selectedFileData && selectedFileDiff" class="flex-1">
-        <DiffViewer
-          :file-name="selectedFileData.path"
-          :diff="selectedFileDiff"
-          :additions="selectedFileData.additions"
-          :deletions="selectedFileData.deletions"
-          max-height="600px"
-          class="diff-viewer"
-        />
-      </div>
-
-      <div v-else class="flex-1 flex items-center justify-center">
-        <div class="text-center text-muted-foreground">
-          <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          <p class="text-lg font-medium">选择文件查看差异</p>
-          <p class="text-sm">点击左侧文件列表中的文件来查看详细变更</p>
-          <p class="text-xs text-muted-foreground mt-2">💡 新布局为代码查看提供了更宽的显示空间</p>
-        </div>
-      </div>
-    </div>
+          <p class="text-xs text-muted-foreground text-center">
+            按 <span class="keyboard-hint">Ctrl+Enter</span> 快速提交
+          </p>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
-/* 优化代码查看体验 */
+/* 优化代码查看体验 - 上下布局提供更宽的显示空间 */
 .diff-viewer {
   min-height: 400px;
-}
-
-/* 响应式布局优化 */
-@media (max-width: 1280px) {
-  .grid.grid-cols-1.xl\\:grid-cols-2 {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-
-  .diff-viewer {
-    min-height: 300px;
-  }
+  width: 100%;
 }
 
 /* 文件列表项悬停效果 */
@@ -456,10 +483,136 @@ const commit = async () => {
   transition: all 0.2s ease-in-out;
 }
 
-/* 确保在小屏幕上有足够的空间 */
-@media (max-width: 768px) {
-  .min-h-\[600px\] {
-    min-height: 400px;
+/* 左侧面板的滚动优化 */
+.left-panel {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.left-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.left-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.left-panel::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--border) / 0.8);
+}
+
+/* 确保右侧差异查看器占据足够空间 */
+.diff-viewer-container {
+  min-width: 0;
+  /* 允许flex收缩 */
+  flex: 1;
+  /* 占据剩余空间 */
+}
+
+/* 空状态图标优化 */
+.empty-state-icon {
+  opacity: 0.5;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* 加载状态优化 */
+.loading-state {
+  background: hsl(var(--muted) / 0.1);
+  border-radius: 0.5rem;
+  padding: 2rem;
+}
+
+/* 确保差异查看器内容不会产生视觉重叠 */
+.diff-viewer-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+/* 统计信息的视觉优化 */
+.diff-stats {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-weight: 600;
+}
+
+/* 优化文件列表的紧凑性 */
+.file-list-item {
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.file-list-item:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+/* 优化表单元素的紧凑性 */
+.commit-form-container input,
+.commit-form-container textarea {
+  font-size: 0.875rem;
+  /* 14px */
+  line-height: 1.25rem;
+  /* 20px */
+}
+
+.commit-form-container label {
+  font-size: 0.875rem;
+  /* 14px */
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+/* 优化复选框区域 */
+.commit-form-container input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 优化文件列表项在紧凑布局中的显示 */
+@media (min-width: 768px) {
+  .file-list-item {
+    padding: 0.5rem;
   }
+
+  .file-list-item .text-xs {
+    font-size: 0.75rem;
+  }
+}
+
+/* 提交对话框样式优化 */
+.commit-dialog-content {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.commit-dialog-stats {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+}
+
+/* 对话框表单元素优化 */
+.commit-dialog-content input,
+.commit-dialog-content textarea {
+  transition: border-color 0.2s ease-in-out;
+}
+
+.commit-dialog-content input:focus,
+.commit-dialog-content textarea:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+}
+
+/* 键盘快捷键提示样式 */
+.keyboard-hint {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  background: hsl(var(--muted));
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
 }
 </style>

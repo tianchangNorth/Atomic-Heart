@@ -242,7 +242,7 @@ onMounted(async () => {
 
 <template>
   <div class="bg-background">
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
+    <div class="mx-auto px-4 py-6">
       <!-- 页面标题 -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>

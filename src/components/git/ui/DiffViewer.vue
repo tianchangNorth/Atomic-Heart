@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 
 interface DiffLine {
   type: 'context' | 'addition' | 'deletion' | 'header';
@@ -31,11 +30,11 @@ const diffLines = computed((): DiffLine[] => {
   if (props.diff) {
     return parseDiff(props.diff);
   }
-  
+
   if (props.oldContent && props.newContent) {
     return generateDiff(props.oldContent, props.newContent);
   }
-  
+
   return [];
 });
 
@@ -45,7 +44,7 @@ function parseDiff(diff: string): DiffLine[] {
   const result: DiffLine[] = [];
   let oldLineNum = 1;
   let newLineNum = 1;
-  
+
   for (const line of lines) {
     if (line.startsWith('@@')) {
       // 解析行号信息
@@ -83,7 +82,7 @@ function parseDiff(diff: string): DiffLine[] {
       });
     }
   }
-  
+
   return result;
 }
 
@@ -92,14 +91,14 @@ function generateDiff(oldContent: string, newContent: string): DiffLine[] {
   const oldLines = oldContent.split('\n');
   const newLines = newContent.split('\n');
   const result: DiffLine[] = [];
-  
+
   // 这里是一个简化的实现，实际应该使用 Myers 算法或其他 diff 算法
   const maxLines = Math.max(oldLines.length, newLines.length);
-  
+
   for (let i = 0; i < maxLines; i++) {
     const oldLine = oldLines[i];
     const newLine = newLines[i];
-    
+
     if (oldLine === newLine) {
       result.push({
         type: 'context',
@@ -137,14 +136,14 @@ function generateDiff(oldContent: string, newContent: string): DiffLine[] {
       });
     }
   }
-  
+
   return result;
 }
 
 // 获取行的样式类
 function getLineClasses(line: DiffLine): string {
   const baseClasses = 'flex font-mono text-sm leading-relaxed';
-  
+
   switch (line.type) {
     case 'addition':
       return `${baseClasses} bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-200`;
@@ -160,7 +159,7 @@ function getLineClasses(line: DiffLine): string {
 // 获取行号的样式类
 function getLineNumberClasses(line: DiffLine): string {
   const baseClasses = 'w-12 px-2 text-right text-xs text-muted-foreground select-none border-r border-border';
-  
+
   switch (line.type) {
     case 'addition':
       return `${baseClasses} bg-green-100 dark:bg-green-900/30`;
@@ -187,15 +186,15 @@ const fileIcon = computed(() => {
     css: 'M1.5 0h21l-1.91 21.563L11.977 24l-8.565-2.438L1.5 0zm17.09 4.413L5.41 4.41l.213 2.622 10.125.002-.255 2.716h-6.64l.24 2.573h6.182l-.366 3.523-2.91.804-2.956-.81-.188-2.11h-2.61l.29 3.855L12 19.288l5.373-1.53L18.59 4.414z',
     html: 'M1.5 0h21l-1.91 21.563L11.977 24l-8.564-2.438L1.5 0zm7.031 9.75l-.232-2.718 10.059.003.23-2.622L5.412 4.41l.698 8.01h9.126l-.326 3.426-2.91.804-2.955-.81-.188-2.11H6.248l.33 4.171L12 19.351l5.379-1.443.744-8.157H8.531z'
   };
-  
+
   return iconMap[fileExtension.value] || 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z';
 });
 </script>
 
 <template>
-  <Card class="w-full">
-    <CardHeader class="pb-3">
-      <CardTitle class="flex items-center justify-between">
+  <Card class="w-full gap-4 shadow-none">
+    <CardHeader class="gap-0">
+      <CardTitle class="flex items-center justify-between p">
         <div class="flex items-center space-x-2">
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path :d="fileIcon"/>
@@ -204,12 +203,12 @@ const fileIcon = computed(() => {
         </div>
         
         <div v-if="additions !== undefined || deletions !== undefined" class="flex items-center space-x-2">
-          <Badge v-if="additions" variant="outline" class="text-green-600 border-green-600">
+          <span v-if="additions" class="text-green-600">
             +{{ additions }}
-          </Badge>
-          <Badge v-if="deletions" variant="outline" class="text-red-600 border-red-600">
+          </span>
+          <span v-if="deletions" class="text-green-600">
             -{{ deletions }}
-          </Badge>
+          </span>
         </div>
       </CardTitle>
     </CardHeader>

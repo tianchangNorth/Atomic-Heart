@@ -111,8 +111,6 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-// 移除冲突相关的处理函数，因为新的数据结构不包含冲突状态
-
 // 生命周期
 onMounted(() => {
   loadRepository();
@@ -121,7 +119,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-background">
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
+    <div class="mx-auto px-4 py-6">
       <!-- 加载状态 -->
       <div v-if="isLoading" class="flex items-center justify-center min-h-[400px]">
         <div class="text-center">
@@ -177,7 +175,7 @@ onMounted(() => {
         </div>
 
         <!-- 快速信息卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardContent class="p-4">
               <div class="flex items-center space-x-3">
@@ -219,7 +217,7 @@ onMounted(() => {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div> -->
 
         <!-- 功能选项卡 -->
         <Tabs v-model="activeTab" class="w-full" default-value="overview">
@@ -308,8 +306,6 @@ onMounted(() => {
         </Tabs>
       </div>
     </div>
-
-    <!-- 冲突解决弹窗已移除，因为新的数据结构不包含冲突状态 -->
   </div>
 </template>
 
