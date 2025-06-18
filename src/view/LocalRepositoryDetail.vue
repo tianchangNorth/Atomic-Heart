@@ -118,8 +118,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background">
-    <div class="mx-auto px-4 py-6">
+  <div class="min-h-800px bg-background">
+    <div class="mx-auto">
       <!-- 加载状态 -->
       <div v-if="isLoading" class="flex items-center justify-center min-h-[400px]">
         <div class="text-center">

@@ -242,7 +242,6 @@ onMounted(async () => {
 
 <template>
   <div class="bg-background">
-    <div class="mx-auto px-4 py-6">
       <!-- 页面标题 -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -531,8 +530,6 @@ onMounted(async () => {
           </CardContent>
         </Card>
       </div>
-
-    </div>
     </div>
 
     <!-- 克隆仓库弹窗 -->
