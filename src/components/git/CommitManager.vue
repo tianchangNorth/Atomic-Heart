@@ -364,7 +364,7 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
             </div>
           </div>
 
-          <div v-else-if="selectedFileData && selectedFileDiff" class="h-full">
+          <div v-else-if="selectedFileData && selectedFileDiff" >
             <DiffViewer
               :file-name="selectedFileData.path"
               :diff="selectedFileDiff"
