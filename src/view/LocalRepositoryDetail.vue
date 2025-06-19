@@ -251,7 +251,7 @@ onMounted(() => {
           </TabsContent>
 
           <TabsContent value="sync">
-            <SyncManager />
+            <SyncManager :repository-path="repository?.path || ''" />
           </TabsContent>
 
           <TabsContent value="branches">

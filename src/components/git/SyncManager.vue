@@ -1,43 +1,69 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, onMounted } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import ProgressBar from './ui/ProgressBar.vue';
-import type { SyncStatus, OperationProgress } from '@/types/git';
+import { useToast } from '@/components/ui/toast';
+import { gitOperationsApi, type SyncResult, type PullStrategy, type RemoteBranchInfo } from '@/api/git-operations';
+import {
+  Download,
+  Upload,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  GitBranch
+} from 'lucide-vue-next';
+
+// Props
+interface Props {
+  repositoryPath: string;
+}
+
+const props = defineProps<Props>();
+
+// Toast
+const { success, error } = useToast();
 
 // 组件状态
-const syncStatus = ref<SyncStatus>({
-  ahead: 3,
-  behind: 2,
-  conflicts: [],
-  lastSync: '2024-12-15T10:30:00Z',
-  remoteStatus: 'connected'
+const syncStatus = reactive({
+  ahead: 0,
+  behind: 0,
+  conflicts: [] as string[],
+  lastSync: null as string | null,
+  remoteStatus: 'unknown' as 'connected' | 'disconnected' | 'unknown'
 });
 
-const currentOperation = ref<OperationProgress | null>(null);
-const operationLogs = ref<string[]>([
-  '[10:30:15] 成功连接到远程仓库',
-  '[10:29:45] 检查远程分支状态',
-  '[10:29:30] 本地分支领先 3 个提交',
-  '[10:29:30] 远程分支领先 2 个提交'
-]);
+const currentOperation = ref<{
+  type: 'fetch' | 'pull' | 'push';
+  progress: number;
+  message: string;
+  loading: boolean;
+} | null>(null);
+
+const operationLogs = ref<string[]>([]);
 
 const syncOptions = reactive({
-  pullMode: 'merge' as 'merge' | 'rebase',
+  pullMode: 'merge' as PullStrategy,
   pushForce: false,
   pushTags: false,
   remoteName: 'origin',
   remoteBranch: 'main'
 });
 
-const isOperating = ref(false);
+// 操作状态
+const fetchState = ref({ loading: false, error: null as string | null });
+const pullState = ref({ loading: false, error: null as string | null });
+const pushState = ref({ loading: false, error: null as string | null });
 
 // 计算属性
-const needsPull = computed(() => syncStatus.value.behind > 0);
-const needsPush = computed(() => syncStatus.value.ahead > 0);
-const hasConflicts = computed(() => syncStatus.value.conflicts.length > 0);
-const isConnected = computed(() => syncStatus.value.remoteStatus === 'connected');
+const needsPull = computed(() => syncStatus.behind > 0);
+const needsPush = computed(() => syncStatus.ahead > 0);
+const hasConflicts = computed(() => syncStatus.conflicts.length > 0);
+const isConnected = computed(() => syncStatus.remoteStatus === 'connected');
+const isOperating = computed(() =>
+  fetchState.value.loading || pullState.value.loading || pushState.value.loading
+);
 
 const statusColor = computed(() => {
   if (hasConflicts.value) return 'text-red-600';
@@ -62,92 +88,177 @@ const addLog = (message: string) => {
   }
 };
 
-const simulateOperation = async (type: 'push' | 'pull', steps: Array<{progress: number, message: string}>) => {
-  isOperating.value = true;
+// 获取远程变更（fetch操作）
+const fetchRemote = async () => {
+  fetchState.value.loading = true;
+  fetchState.value.error = null;
+
   currentOperation.value = {
-    id: `${type}-${Date.now()}`,
-    type,
-    status: 'running',
+    type: 'fetch',
     progress: 0,
-    message: '准备中...',
-    startTime: new Date().toISOString()
+    message: '连接到远程仓库...',
+    loading: true
   };
 
-  for (const step of steps) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    currentOperation.value!.progress = step.progress;
-    currentOperation.value!.message = step.message;
-    addLog(step.message);
-  }
+  addLog('开始获取远程变更...');
 
-  currentOperation.value!.status = 'success';
-  currentOperation.value!.endTime = new Date().toISOString();
-  
-  // 更新同步状态
-  if (type === 'pull') {
-    syncStatus.value.behind = 0;
-    syncStatus.value.lastSync = new Date().toISOString();
-  } else if (type === 'push') {
-    syncStatus.value.ahead = 0;
-    syncStatus.value.lastSync = new Date().toISOString();
-  }
+  try {
+    currentOperation.value.progress = 30;
+    currentOperation.value.message = '获取远程变更...';
+    console.log('xxxx', props.repositoryPath);
 
-  setTimeout(() => {
-    currentOperation.value = null;
-    isOperating.value = false;
-  }, 2000);
+    const result: SyncResult = await gitOperationsApi.fetchRemote(props.repositoryPath);
+
+    currentOperation.value.progress = 100;
+    currentOperation.value.message = '获取完成';
+
+    if (result.success) {
+      syncStatus.ahead = result.ahead;
+      syncStatus.behind = result.behind;
+      syncStatus.lastSync = new Date().toISOString();
+      syncStatus.remoteStatus = 'connected';
+
+      addLog(`获取成功 - 领先 ${result.ahead} 个提交，落后 ${result.behind} 个提交`);
+      success(result.message);
+    } else {
+      addLog(`获取失败: ${result.message}`);
+      error(result.message);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : '获取远程变更失败';
+    fetchState.value.error = errorMessage;
+    syncStatus.remoteStatus = 'disconnected';
+    addLog(`获取失败: ${errorMessage}`);
+    error(errorMessage);
+  } finally {
+    fetchState.value.loading = false;
+    setTimeout(() => {
+      currentOperation.value = null;
+    }, 1000);
+  }
 };
 
+// 拉取远程变更（pull操作）
 const pull = async () => {
-  const steps = [
-    { progress: 20, message: '连接到远程仓库...' },
-    { progress: 40, message: '获取远程变更...' },
-    { progress: 60, message: '合并远程变更...' },
-    { progress: 80, message: '更新工作目录...' },
-    { progress: 100, message: '拉取完成！' }
-  ];
+  pullState.value.loading = true;
+  pullState.value.error = null;
 
-  if (syncOptions.pullMode === 'rebase') {
-    steps[2] = { progress: 60, message: '变基远程变更...' };
+  currentOperation.value = {
+    type: 'pull',
+    progress: 0,
+    message: '准备拉取...',
+    loading: true
+  };
+
+  addLog(`开始拉取远程变更 (${syncOptions.pullMode})...`);
+
+  try {
+    currentOperation.value.progress = 20;
+    currentOperation.value.message = '连接到远程仓库...';
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    currentOperation.value.progress = 60;
+    currentOperation.value.message = '拉取远程变更...';
+
+    const result: SyncResult = await gitOperationsApi.pullRemote(props.repositoryPath, syncOptions.pullMode);
+
+    currentOperation.value.progress = 100;
+    currentOperation.value.message = '拉取完成';
+
+    if (result.success) {
+      if (result.has_conflicts) {
+        syncStatus.conflicts = result.conflict_files;
+        addLog(`拉取完成但存在冲突: ${result.conflict_files.join(', ')}`);
+        error('拉取时发现冲突，请手动解决后重试');
+      } else {
+        syncStatus.behind = result.behind;
+        syncStatus.ahead = result.ahead;
+        syncStatus.lastSync = new Date().toISOString();
+        addLog('拉取成功');
+        success(result.message);
+      }
+    } else {
+      addLog(`拉取失败: ${result.message}`);
+      error(result.message);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : '拉取远程变更失败';
+    pullState.value.error = errorMessage;
+    addLog(`拉取失败: ${errorMessage}`);
+    error(errorMessage);
+  } finally {
+    pullState.value.loading = false;
+    setTimeout(() => {
+      currentOperation.value = null;
+    }, 1000);
   }
-
-  await simulateOperation('pull', steps);
 };
 
+// 推送本地变更（push操作）
 const push = async () => {
-  const steps = [
-    { progress: 20, message: '连接到远程仓库...' },
-    { progress: 40, message: '检查推送权限...' },
-    { progress: 60, message: '上传本地变更...' },
-    { progress: 80, message: '更新远程分支...' },
-    { progress: 100, message: '推送完成！' }
-  ];
+  pushState.value.loading = true;
+  pushState.value.error = null;
 
-  await simulateOperation('push', steps);
+  currentOperation.value = {
+    type: 'push',
+    progress: 0,
+    message: '准备推送...',
+    loading: true
+  };
+
+  addLog('开始推送本地变更...');
+
+  try {
+    currentOperation.value.progress = 20;
+    currentOperation.value.message = '连接到远程仓库...';
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    currentOperation.value.progress = 60;
+    currentOperation.value.message = '推送本地变更...';
+
+    const result: SyncResult = await gitOperationsApi.pushRemote(
+      props.repositoryPath,
+      syncOptions.remoteName,
+      syncOptions.pushForce
+    );
+
+    currentOperation.value.progress = 100;
+    currentOperation.value.message = '推送完成';
+
+    if (result.success) {
+      syncStatus.ahead = result.ahead;
+      syncStatus.behind = result.behind;
+      syncStatus.lastSync = new Date().toISOString();
+      addLog('推送成功');
+      success(result.message);
+    } else {
+      addLog(`推送失败: ${result.message}`);
+      error(result.message);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : '推送本地变更失败';
+    pushState.value.error = errorMessage;
+    addLog(`推送失败: ${errorMessage}`);
+    error(errorMessage);
+  } finally {
+    pushState.value.loading = false;
+    setTimeout(() => {
+      currentOperation.value = null;
+    }, 1000);
+  }
 };
 
+// 同步操作（先拉取后推送）
 const sync = async () => {
   if (needsPull.value) {
     await pull();
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  if (needsPush.value) {
+  if (needsPush.value && !hasConflicts.value) {
     await push();
   }
-};
-
-const fetchStatus = async () => {
-  addLog('检查远程仓库状态...');
-  
-  // 模拟状态检查
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // 随机更新状态
-  syncStatus.value.ahead = Math.floor(Math.random() * 5);
-  syncStatus.value.behind = Math.floor(Math.random() * 3);
-  syncStatus.value.lastSync = new Date().toISOString();
-  
-  addLog(`检查完成 - 领先 ${syncStatus.value.ahead} 个提交，落后 ${syncStatus.value.behind} 个提交`);
 };
 
 const formatLastSync = (dateString: string) => {
@@ -155,12 +266,29 @@ const formatLastSync = (dateString: string) => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / (1000 * 60));
-  
+
   if (diffMins < 1) return '刚刚';
   if (diffMins < 60) return `${diffMins} 分钟前`;
   if (diffMins < 1440) return `${Math.floor(diffMins / 60)} 小时前`;
   return `${Math.floor(diffMins / 1440)} 天前`;
 };
+
+// 初始化时获取远程信息和状态
+onMounted(async () => {
+  try {
+    // 首先获取远程信息以确定正确的远程名称
+    const remoteInfo = await gitOperationsApi.getRemoteInfo(props.repositoryPath);
+    syncOptions.remoteName = remoteInfo.remote_name;
+    syncOptions.remoteBranch = remoteInfo.branch_name;
+
+    // 然后获取远程变更
+    await fetchRemote();
+  } catch (error) {
+    console.error('初始化远程信息失败:', error);
+    // 如果获取远程信息失败，仍然尝试fetch
+    await fetchRemote();
+  }
+});
 </script>
 
 <template>
@@ -172,9 +300,7 @@ const formatLastSync = (dateString: string) => {
         <CardHeader>
           <CardTitle class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
-              </svg>
+              <GitBranch class="w-5 h-5" />
               <span>远程仓库状态</span>
             </div>
             <div class="flex items-center space-x-2">
@@ -184,10 +310,9 @@ const formatLastSync = (dateString: string) => {
               >
                 {{ isConnected ? '已连接' : '连接失败' }}
               </Badge>
-              <Button variant="ghost" size="sm" @click="fetchStatus" :disabled="isOperating">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
+              <Button variant="ghost" size="sm" @click="fetchRemote" :disabled="isOperating">
+                <Loader2 v-if="fetchState.loading" class="w-4 h-4 animate-spin" />
+                <RefreshCw v-else class="w-4 h-4" />
               </Button>
             </div>
           </CardTitle>
@@ -204,11 +329,9 @@ const formatLastSync = (dateString: string) => {
             </div>
             <div class="space-y-2">
               <div class="text-2xl font-bold" :class="statusColor">
-                <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path v-if="hasConflicts" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                  <path v-else-if="needsPull || needsPush" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <AlertCircle v-if="hasConflicts" class="w-8 h-8 mx-auto" />
+                <RefreshCw v-else-if="needsPull || needsPush" class="w-8 h-8 mx-auto" />
+                <CheckCircle2 v-else class="w-8 h-8 mx-auto" />
               </div>
               <div class="text-sm text-muted-foreground">{{ statusText }}</div>
             </div>
@@ -224,10 +347,7 @@ const formatLastSync = (dateString: string) => {
       <Card>
         <CardHeader>
           <CardTitle class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
+            <RefreshCw class="w-5 h-5" />
             <span>同步选项</span>
           </CardTitle>
         </CardHeader>
@@ -274,48 +394,43 @@ const formatLastSync = (dateString: string) => {
       <Card>
         <CardHeader>
           <CardTitle class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/>
-            </svg>
+            <GitBranch class="w-5 h-5" />
             <span>同步操作</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Button 
-              @click="pull" 
+            <Button
+              @click="pull"
               :disabled="!needsPull || isOperating"
               variant="outline"
               class="flex flex-col items-center p-4 h-auto"
             >
-              <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4l-8 8h6v8h4v-8h6l-8-8z"/>
-              </svg>
+              <Loader2 v-if="pullState.loading" class="w-6 h-6 mb-2 animate-spin" />
+              <Download v-else class="w-6 h-6 mb-2" />
               <span>拉取</span>
               <span class="text-xs text-muted-foreground">{{ syncStatus.behind }} 个提交</span>
             </Button>
 
-            <Button 
-              @click="push" 
+            <Button
+              @click="push"
               :disabled="!needsPush || isOperating"
               variant="outline"
               class="flex flex-col items-center p-4 h-auto"
             >
-              <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20l8-8h-6V4h-4v8H4l8 8z"/>
-              </svg>
+              <Loader2 v-if="pushState.loading" class="w-6 h-6 mb-2 animate-spin" />
+              <Upload v-else class="w-6 h-6 mb-2" />
               <span>推送</span>
               <span class="text-xs text-muted-foreground">{{ syncStatus.ahead }} 个提交</span>
             </Button>
 
-            <Button 
-              @click="sync" 
+            <Button
+              @click="sync"
               :disabled="(!needsPull && !needsPush) || isOperating"
               class="flex flex-col items-center p-4 h-auto"
             >
-              <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
+              <Loader2 v-if="isOperating" class="w-6 h-6 mb-2 animate-spin" />
+              <RefreshCw v-else class="w-6 h-6 mb-2" />
               <span>同步</span>
               <span class="text-xs text-muted-foreground">拉取 + 推送</span>
             </Button>
@@ -323,11 +438,18 @@ const formatLastSync = (dateString: string) => {
 
           <!-- 操作进度 -->
           <div v-if="currentOperation" class="mt-6">
-            <ProgressBar
-              :progress="currentOperation.progress"
-              :status="currentOperation.status"
-              :message="currentOperation.message"
-            />
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-sm">
+                <span>{{ currentOperation.message }}</span>
+                <span>{{ currentOperation.progress }}%</span>
+              </div>
+              <div class="w-full bg-muted rounded-full h-2">
+                <div
+                  class="bg-primary h-2 rounded-full transition-all duration-300"
+                  :style="{ width: `${currentOperation.progress}%` }"
+                ></div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -339,14 +461,12 @@ const formatLastSync = (dateString: string) => {
         <CardHeader>
           <CardTitle class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
+              <RefreshCw class="w-5 h-5" />
               <span>操作日志</span>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               @click="operationLogs = []"
             >
               清空
@@ -356,12 +476,10 @@ const formatLastSync = (dateString: string) => {
         <CardContent>
           <div class="space-y-1 max-h-96 overflow-y-auto">
             <div v-if="operationLogs.length === 0" class="text-center py-8 text-muted-foreground">
-              <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
+              <RefreshCw class="w-12 h-12 mx-auto mb-2" />
               <p>暂无操作日志</p>
             </div>
-            
+
             <div
               v-for="(log, index) in operationLogs"
               :key="index"

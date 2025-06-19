@@ -281,3 +281,43 @@ pub struct CommitHistoryItem {
     /// 父提交数量
     pub parent_count: usize,
 }
+
+/// 同步操作结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncResult {
+    /// 操作是否成功
+    pub success: bool,
+    /// 操作消息
+    pub message: String,
+    /// 是否有冲突
+    pub has_conflicts: bool,
+    /// 冲突文件列表
+    pub conflict_files: Vec<String>,
+    /// 更新后的ahead/behind状态
+    pub ahead: u32,
+    pub behind: u32,
+}
+
+/// Pull策略
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PullStrategy {
+    /// 合并策略
+    Merge,
+    /// 变基策略
+    Rebase,
+}
+
+/// 远程分支信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteBranchInfo {
+    /// 远程名称
+    pub remote_name: String,
+    /// 分支名称
+    pub branch_name: String,
+    /// 本地领先提交数
+    pub ahead: u32,
+    /// 本地落后提交数
+    pub behind: u32,
+    /// 最后同步时间
+    pub last_sync: Option<i64>,
+}

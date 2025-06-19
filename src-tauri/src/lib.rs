@@ -109,7 +109,12 @@ pub fn run() {
             commands::git::unstage_files,
             commands::git::create_commit,
             commands::git::get_commit_history,
-            commands::git::get_file_diff
+            commands::git::get_file_diff,
+            // 同步操作命令
+            commands::git::fetch_remote,
+            commands::git::pull_remote,
+            commands::git::push_remote,
+            commands::git::get_remote_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

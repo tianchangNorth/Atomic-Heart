@@ -29,6 +29,25 @@ export interface CommitHistoryItem {
   parent_count: number;
 }
 
+export interface SyncResult {
+  success: boolean;
+  message: string;
+  has_conflicts: boolean;
+  conflict_files: string[];
+  ahead: number;
+  behind: number;
+}
+
+export type PullStrategy = 'merge' | 'rebase';
+
+export interface RemoteBranchInfo {
+  remote_name: string;
+  branch_name: string;
+  ahead: number;
+  behind: number;
+  last_sync: number | null;
+}
+
 export interface CommitOptions {
   message: string;
   description?: string;
@@ -110,8 +129,8 @@ export class GitOperationsApi {
    * 获取提交历史
    */
   async getCommitHistory(
-    repoPath: string, 
-    limit?: number, 
+    repoPath: string,
+    limit?: number,
     skip?: number
   ): Promise<CommitHistoryItem[]> {
     try {
@@ -131,8 +150,8 @@ export class GitOperationsApi {
    * 获取文件差异
    */
   async getFileDiff(
-    repoPath: string, 
-    filePath: string, 
+    repoPath: string,
+    filePath: string,
     staged?: boolean
   ): Promise<string> {
     try {
@@ -179,6 +198,70 @@ export class GitOperationsApi {
     const stagedFiles = files.filter(f => f.staged).map(f => f.path);
     if (stagedFiles.length > 0) {
       return this.unstageFiles(repoPath, stagedFiles);
+    }
+  }
+
+  /**
+   * 获取远程变更（fetch操作）
+   */
+  async fetchRemote(repoPath: string, remoteName?: string): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('fetch_remote', {
+        repoPath: repoPath,
+        remoteName: remoteName
+      });
+      return result;
+    } catch (error) {
+      console.error('获取远程变更失败:', error);
+      throw new Error(`获取远程变更失败: ${error}`);
+    }
+  }
+
+  /**
+   * 拉取远程变更（pull操作）
+   */
+  async pullRemote(repoPath: string, strategy: PullStrategy): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('pull_remote', {
+        repoPath: repoPath,
+        strategy
+      });
+      return result;
+    } catch (error) {
+      console.error('拉取远程变更失败:', error);
+      throw new Error(`拉取远程变更失败: ${error}`);
+    }
+  }
+
+  /**
+   * 推送本地变更（push操作）
+   */
+  async pushRemote(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('push_remote', {
+        repoPath: repoPath,
+        remote_name: remoteName,
+        force
+      });
+      return result;
+    } catch (error) {
+      console.error('推送本地变更失败:', error);
+      throw new Error(`推送本地变更失败: ${error}`);
+    }
+  }
+
+  /**
+   * 获取远程仓库信息
+   */
+  async getRemoteInfo(repoPath: string): Promise<RemoteBranchInfo> {
+    try {
+      const result = await invoke<RemoteBranchInfo>('get_remote_info', {
+        repo_path: repoPath
+      });
+      return result;
+    } catch (error) {
+      console.error('获取远程仓库信息失败:', error);
+      throw new Error(`获取远程仓库信息失败: ${error}`);
     }
   }
 }

@@ -624,3 +624,88 @@ pub async fn get_file_diff(
         }
     }
 }
+
+/// 获取远程变更（fetch操作）
+#[command]
+pub async fn fetch_remote(
+    repo_path: String,
+    remote_name: Option<String>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!("获取远程变更: {} (remote: {:?})", repo_path, remote_name);
+
+    match crate::git::operations::fetch_remote(&repo_path, remote_name.as_deref()) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            log::error!("获取远程变更失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 拉取远程变更（pull操作）
+#[command]
+pub async fn pull_remote(
+    repo_path: String,
+    strategy: String,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!("拉取远程变更: {} (strategy: {})", repo_path, strategy);
+
+    let pull_strategy = match strategy.as_str() {
+        "merge" => crate::git::types::PullStrategy::Merge,
+        "rebase" => crate::git::types::PullStrategy::Rebase,
+        _ => {
+            return Err("无效的拉取策略，支持: merge, rebase".to_string());
+        }
+    };
+
+    match crate::git::operations::pull_remote(&repo_path, pull_strategy) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            log::error!("拉取远程变更失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 推送本地变更（push操作）
+#[command]
+pub async fn push_remote(
+    repo_path: String,
+    remote_name: Option<String>,
+    force: Option<bool>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "推送本地变更: {} (remote: {:?}, force: {:?})",
+        repo_path,
+        remote_name,
+        force
+    );
+
+    match crate::git::operations::push_remote(
+        &repo_path,
+        remote_name.as_deref(),
+        force.unwrap_or(false),
+    ) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            log::error!("推送本地变更失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 获取远程仓库信息
+#[command]
+pub async fn get_remote_info(
+    repo_path: String,
+) -> Result<crate::git::types::RemoteBranchInfo, String> {
+    log::debug!("获取远程仓库信息: {}", repo_path);
+
+    match crate::git::operations::get_remote_info(&repo_path) {
+        Ok(info) => Ok(info),
+        Err(e) => {
+            log::error!("获取远程仓库信息失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
