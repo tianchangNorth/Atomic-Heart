@@ -199,8 +199,8 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-[600px] gap-6">
-    <div class="flex flex-col w-full max-w-md flex-shrink-0 space-y-4 left-panel">
+  <div class="flex h-full gap-6">
+    <div class="flex flex-col w-88 flex-shrink-0 space-y-4 left-panel">
       <!-- 文件变更 -->
       <Card class="gap-0">
          <CardContent class="space-y-4">
@@ -353,7 +353,7 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
             />
           </div>
 
-          <div v-else class="flex items-center justify-center flex-1">
+          <div v-else class="flex items-center justify-center flex-1 mt-10">
             <div class="text-center text-muted-foreground">
               <FileText class="w-16 h-16 mx-auto mb-4 empty-state-icon" />
               <p class="text-lg font-medium">选择文件查看差异</p>

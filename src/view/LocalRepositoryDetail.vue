@@ -118,7 +118,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-800px bg-background">
+  <div class="bg-background">
     <div class="mx-auto">
       <!-- 加载状态 -->
       <div v-if="isLoading" class="flex items-center justify-center min-h-[400px]">
@@ -153,7 +153,6 @@ onMounted(() => {
                 {{ getStatusText(repository.status) }}
               </Badge>
             </div>
-            <p class="text-muted-foreground">{{ repository.path }}</p>
           </div>
           
           <!-- 操作按钮 -->
