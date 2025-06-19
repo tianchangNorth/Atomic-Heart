@@ -57,6 +57,17 @@ export interface CommitOptions {
   signoff?: boolean;
 }
 
+// 新增：双协议认证系统类型定义
+export interface TokenConfig {
+  domain: string;
+  token: string;
+  username?: string;
+  created_at: number;
+  last_used?: number;
+}
+
+export type ProtocolType = 'https' | 'ssh' | 'unknown';
+
 // Git 操作 API
 export class GitOperationsApi {
   /**
@@ -262,6 +273,299 @@ export class GitOperationsApi {
     } catch (error) {
       console.error('获取远程仓库信息失败:', error);
       throw new Error(`获取远程仓库信息失败: ${error}`);
+    }
+  }
+
+  // ==================== 双协议认证系统 ====================
+
+  /**
+   * 检测仓库协议类型
+   */
+  async detectRepositoryProtocol(repoPath: string): Promise<ProtocolType> {
+    try {
+      const protocol = await invoke<string>('detect_repository_protocol', {
+        repoPath
+      });
+      return protocol as ProtocolType;
+    } catch (error) {
+      console.error('检测仓库协议失败:', error);
+      return 'unknown';
+    }
+  }
+
+  /**
+   * 从URL提取域名
+   */
+  async extractDomainFromUrl(url: string): Promise<string> {
+    try {
+      const domain = await invoke<string>('extract_domain_from_url', {
+        url
+      });
+      return domain;
+    } catch (error) {
+      console.error('提取域名失败:', error);
+      throw new Error(`提取域名失败: ${error}`);
+    }
+  }
+
+  /**
+   * 存储Personal Access Token
+   */
+  async storeAccessToken(domain: string, token: string, username?: string): Promise<void> {
+    try {
+      await invoke('store_access_token', {
+        domain,
+        token,
+        username
+      });
+    } catch (error) {
+      console.error('存储Token失败:', error);
+      throw new Error(`存储Token失败: ${error}`);
+    }
+  }
+
+  /**
+   * 获取Personal Access Token
+   */
+  async getAccessToken(domain: string): Promise<TokenConfig | null> {
+    try {
+      const token = await invoke<TokenConfig | null>('get_access_token', {
+        domain
+      });
+      return token;
+    } catch (error) {
+      console.error('获取Token失败:', error);
+      throw new Error(`获取Token失败: ${error}`);
+    }
+  }
+
+  /**
+   * 删除Personal Access Token
+   */
+  async deleteAccessToken(domain: string): Promise<void> {
+    try {
+      await invoke('delete_access_token', {
+        domain
+      });
+    } catch (error) {
+      console.error('删除Token失败:', error);
+      throw new Error(`删除Token失败: ${error}`);
+    }
+  }
+
+  /**
+   * 获取所有存储的Token
+   */
+  async getAllTokens(): Promise<TokenConfig[]> {
+    try {
+      const tokens = await invoke<TokenConfig[]>('get_all_tokens');
+      return tokens;
+    } catch (error) {
+      console.error('获取所有Token失败:', error);
+      throw new Error(`获取所有Token失败: ${error}`);
+    }
+  }
+
+  /**
+   * 更新Token最后使用时间
+   */
+  async updateTokenLastUsed(domain: string): Promise<void> {
+    try {
+      await invoke('update_token_last_used', {
+        domain
+      });
+    } catch (error) {
+      console.error('更新Token使用时间失败:', error);
+      // 这个错误不需要抛出，因为不影响主要功能
+    }
+  }
+
+  // ==================== 远程名称检测 ====================
+
+  /**
+   * 检测仓库的远程配置
+   */
+  async detectRepositoryRemotes(repoPath: string): Promise<string[]> {
+    try {
+      const remotes = await invoke<string[]>('detect_repository_remotes', {
+        repoPath
+      });
+      return remotes;
+    } catch (error) {
+      console.error('检测远程配置失败:', error);
+      throw new Error(`检测远程配置失败: ${error}`);
+    }
+  }
+
+  /**
+   * 获取默认远程名称
+   */
+  async getDefaultRemoteName(repoPath: string): Promise<string> {
+    try {
+      const remoteName = await invoke<string>('get_default_remote_name_command', {
+        repoPath
+      });
+      return remoteName;
+    } catch (error) {
+      console.error('获取默认远程名称失败:', error);
+      throw new Error(`获取默认远程名称失败: ${error}`);
+    }
+  }
+
+  // ==================== 智能协议选择的Git操作 ====================
+
+  /**
+   * 智能fetch操作（自动选择协议）
+   */
+  async smartFetchRemote(repoPath: string, remoteName?: string): Promise<SyncResult> {
+    const protocol = await this.detectRepositoryProtocol(repoPath);
+
+    if (protocol === 'ssh') {
+      return this.fetchRemoteWithSystemGit(repoPath, remoteName);
+    } else if (protocol === 'https') {
+      // 使用支持Token认证的智能fetch
+      return this.smartFetchRemoteWithToken(repoPath, remoteName);
+    } else {
+      // 默认使用git2
+      return this.fetchRemote(repoPath, remoteName);
+    }
+  }
+
+  /**
+   * 智能fetch操作（支持Token认证）
+   */
+  async smartFetchRemoteWithToken(repoPath: string, remoteName?: string): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('smart_fetch_remote', {
+        repoPath,
+        remoteName
+      });
+      return result;
+    } catch (error) {
+      console.error('智能fetch操作失败:', error);
+      throw new Error(`智能fetch操作失败: ${error}`);
+    }
+  }
+
+  /**
+   * 智能push操作（自动选择协议）
+   */
+  async smartPushRemote(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+    const protocol = await this.detectRepositoryProtocol(repoPath);
+
+    if (protocol === 'ssh') {
+      return this.pushRemoteWithSystemGit(repoPath, remoteName, force);
+    } else if (protocol === 'https') {
+      // 使用支持Token认证的智能push
+      return this.smartPushRemoteWithToken(repoPath, remoteName, force);
+    } else {
+      // 默认使用git2
+      return this.pushRemote(repoPath, remoteName, force);
+    }
+  }
+
+  /**
+   * 智能push操作（支持Token认证）
+   */
+  async smartPushRemoteWithToken(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('smart_push_remote', {
+        repoPath,
+        remoteName,
+        force
+      });
+      return result;
+    } catch (error) {
+      console.error('智能push操作失败:', error);
+      throw new Error(`智能push操作失败: ${error}`);
+    }
+  }
+
+  /**
+   * 智能pull操作（自动选择协议）
+   */
+  async smartPullRemote(repoPath: string, strategy: PullStrategy): Promise<SyncResult> {
+    const protocol = await this.detectRepositoryProtocol(repoPath);
+
+    if (protocol === 'ssh') {
+      return this.pullRemoteWithSystemGit(repoPath, strategy);
+    } else if (protocol === 'https') {
+      // 检查并更新token认证
+      await this.ensureHttpsAuthentication(repoPath);
+      return this.pullRemote(repoPath, strategy);
+    } else {
+      // 默认使用git2
+      return this.pullRemote(repoPath, strategy);
+    }
+  }
+
+  // ==================== 系统Git命令操作 ====================
+
+  /**
+   * 使用系统Git执行fetch操作
+   */
+  async fetchRemoteWithSystemGit(repoPath: string, remoteName?: string): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('fetch_remote_with_system_git', {
+        repoPath,
+        remoteName
+      });
+      return result;
+    } catch (error) {
+      console.error('系统Git fetch失败:', error);
+      throw new Error(`系统Git fetch失败: ${error}`);
+    }
+  }
+
+  /**
+   * 使用系统Git执行push操作
+   */
+  async pushRemoteWithSystemGit(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('push_remote_with_system_git', {
+        repoPath,
+        remoteName,
+        force
+      });
+      return result;
+    } catch (error) {
+      console.error('系统Git push失败:', error);
+      throw new Error(`系统Git push失败: ${error}`);
+    }
+  }
+
+  /**
+   * 使用系统Git执行pull操作
+   */
+  async pullRemoteWithSystemGit(repoPath: string, strategy: PullStrategy): Promise<SyncResult> {
+    try {
+      const result = await invoke<SyncResult>('pull_remote_with_system_git', {
+        repoPath,
+        strategy
+      });
+      return result;
+    } catch (error) {
+      console.error('系统Git pull失败:', error);
+      throw new Error(`系统Git pull失败: ${error}`);
+    }
+  }
+
+  // ==================== 私有辅助方法 ====================
+
+  /**
+   * 确保HTTPS协议的认证配置
+   */
+  private async ensureHttpsAuthentication(repoPath: string): Promise<void> {
+    try {
+      // 获取远程URL
+      const remoteInfo = await this.getRemoteInfo(repoPath);
+      if (!remoteInfo.remote_name) return;
+
+      // 这里可以添加获取远程URL的逻辑
+      // 然后检查是否有对应的token
+      // 如果没有，可以触发token配置流程
+    } catch (error) {
+      console.warn('检查HTTPS认证失败:', error);
     }
   }
 }

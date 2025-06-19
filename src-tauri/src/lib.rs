@@ -114,7 +114,25 @@ pub fn run() {
             commands::git::fetch_remote,
             commands::git::pull_remote,
             commands::git::push_remote,
-            commands::git::get_remote_info
+            commands::git::get_remote_info,
+            // 智能Git操作（支持Token认证）
+            commands::git::smart_fetch_remote,
+            commands::git::smart_push_remote,
+            // 双协议认证系统
+            commands::git::detect_repository_protocol,
+            commands::git::extract_domain_from_url,
+            commands::git::store_access_token,
+            commands::git::get_access_token,
+            commands::git::delete_access_token,
+            commands::git::get_all_tokens,
+            commands::git::update_token_last_used,
+            // 系统Git命令
+            commands::git::fetch_remote_with_system_git,
+            commands::git::push_remote_with_system_git,
+            commands::git::pull_remote_with_system_git,
+            // 远程名称检测
+            commands::git::detect_repository_remotes,
+            commands::git::get_default_remote_name_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

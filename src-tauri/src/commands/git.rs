@@ -5,8 +5,10 @@ use crate::git::{
 use git2::Repository;
 use std::collections::HashMap;
 use std::path::Path;
+
 use std::sync::Mutex;
-use tauri::{command, State, Window};
+use tauri::{command, AppHandle, State, Window};
+use tauri_plugin_store::StoreBuilder;
 
 /// Git 命令状态管理
 pub struct GitState {
@@ -453,23 +455,22 @@ pub async fn open_folder(path: String) -> Result<(), String> {
 
 /// 获取远程 URL（内部函数）
 fn get_remote_url_internal(repo: &Repository) -> Option<String> {
-    // 尝试获取 origin 远程
-    match repo.find_remote("origin") {
-        Ok(remote) => {
+    // 首先尝试获取默认远程名称
+    if let Ok(default_remote) = crate::git::operations::get_default_remote_name(repo) {
+        if let Ok(remote) = repo.find_remote(&default_remote) {
             if let Some(url) = remote.url() {
                 return Some(url.to_string());
             }
         }
-        Err(_) => {
-            // 如果没有 origin，尝试获取第一个远程
-            if let Ok(remotes) = repo.remotes() {
-                for remote_name in remotes.iter() {
-                    if let Some(name) = remote_name {
-                        if let Ok(remote) = repo.find_remote(name) {
-                            if let Some(url) = remote.url() {
-                                return Some(url.to_string());
-                            }
-                        }
+    }
+
+    // 如果默认远程获取失败，尝试获取第一个可用的远程
+    if let Ok(remotes) = repo.remotes() {
+        for remote_name in remotes.iter() {
+            if let Some(name) = remote_name {
+                if let Ok(remote) = repo.find_remote(name) {
+                    if let Some(url) = remote.url() {
+                        return Some(url.to_string());
                     }
                 }
             }
@@ -642,6 +643,47 @@ pub async fn fetch_remote(
     }
 }
 
+/// 智能获取远程变更（支持Token认证）
+#[command]
+pub async fn smart_fetch_remote(
+    app_handle: AppHandle,
+    repo_path: String,
+    remote_name: Option<String>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "智能获取远程变更: {} (remote: {:?})",
+        repo_path,
+        remote_name
+    );
+
+    // 获取远程URL并提取域名
+    let token_cache = match get_token_for_repository(&app_handle, &repo_path).await {
+        Ok(token) => token,
+        Err(e) => {
+            log::warn!("获取Token失败，使用默认认证: {}", e);
+            None
+        }
+    };
+
+    if let Some(ref _token) = token_cache {
+        log::debug!("使用Token认证进行fetch操作");
+    } else {
+        log::debug!("使用默认认证进行fetch操作");
+    }
+
+    match crate::git::operations::fetch_remote_with_token(
+        &repo_path,
+        remote_name.as_deref(),
+        token_cache,
+    ) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            log::error!("智能获取远程变更失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
 /// 拉取远程变更（pull操作）
 #[command]
 pub async fn pull_remote(
@@ -695,6 +737,50 @@ pub async fn push_remote(
     }
 }
 
+/// 智能推送本地变更（支持Token认证）
+#[command]
+pub async fn smart_push_remote(
+    app_handle: AppHandle,
+    repo_path: String,
+    remote_name: Option<String>,
+    force: Option<bool>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "智能推送本地变更: {} (remote: {:?}, force: {:?})",
+        repo_path,
+        remote_name,
+        force
+    );
+
+    // 获取远程URL并提取域名
+    let token_cache = match get_token_for_repository(&app_handle, &repo_path).await {
+        Ok(token) => token,
+        Err(e) => {
+            log::warn!("获取Token失败，使用默认认证: {}", e);
+            None
+        }
+    };
+
+    if let Some(ref _token) = token_cache {
+        log::debug!("使用Token认证进行push操作");
+    } else {
+        log::debug!("使用默认认证进行push操作");
+    }
+
+    match crate::git::operations::push_remote_with_token(
+        &repo_path,
+        remote_name.as_deref(),
+        force.unwrap_or(false),
+        token_cache,
+    ) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            log::error!("智能推送本地变更失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
 /// 获取远程仓库信息
 #[command]
 pub async fn get_remote_info(
@@ -707,6 +793,692 @@ pub async fn get_remote_info(
         Err(e) => {
             log::error!("获取远程仓库信息失败: {}", e);
             Err(e.to_string())
+        }
+    }
+}
+
+// ==================== 新增：双协议认证系统 ====================
+
+/// 协议类型
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ProtocolType {
+    Https,
+    Ssh,
+}
+
+/// Token配置
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct TokenConfig {
+    pub domain: String,
+    pub token: String,
+    pub username: Option<String>,
+    pub created_at: i64,
+    pub last_used: Option<i64>,
+}
+
+/// 检测远程仓库URL的协议类型
+#[command]
+pub async fn detect_repository_protocol(repo_path: String) -> Result<String, String> {
+    log::debug!("检测仓库协议类型: {}", repo_path);
+
+    // 获取远程URL
+    match get_remote_url(repo_path).await? {
+        Some(url) => {
+            let protocol = if url.starts_with("https://") || url.starts_with("http://") {
+                "https"
+            } else if url.starts_with("git@") || url.starts_with("ssh://") {
+                "ssh"
+            } else {
+                "unknown"
+            };
+
+            log::debug!("检测到协议类型: {} for URL: {}", protocol, url);
+            Ok(protocol.to_string())
+        }
+        None => {
+            log::warn!("未找到远程URL");
+            Err("未找到远程URL".to_string())
+        }
+    }
+}
+
+/// 从URL提取域名
+#[command]
+pub async fn extract_domain_from_url(url: String) -> Result<String, String> {
+    log::debug!("从URL提取域名: {}", url);
+
+    // 处理HTTPS URL
+    if url.starts_with("https://") || url.starts_with("http://") {
+        if let Ok(parsed_url) = url::Url::parse(&url) {
+            if let Some(host) = parsed_url.host_str() {
+                return Ok(host.to_string());
+            }
+        }
+    }
+
+    // 处理SSH URL (git@github.com:user/repo.git)
+    if url.starts_with("git@") {
+        if let Some(at_pos) = url.find('@') {
+            if let Some(colon_pos) = url[at_pos..].find(':') {
+                let domain = &url[at_pos + 1..at_pos + colon_pos];
+                return Ok(domain.to_string());
+            }
+        }
+    }
+
+    // 处理SSH URL (ssh://git@github.com/user/repo.git)
+    if url.starts_with("ssh://") {
+        if let Ok(parsed_url) = url::Url::parse(&url) {
+            if let Some(host) = parsed_url.host_str() {
+                return Ok(host.to_string());
+            }
+        }
+    }
+
+    Err("无法从URL提取域名".to_string())
+}
+
+/// 存储Personal Access Token
+#[command]
+pub async fn store_access_token(
+    app_handle: AppHandle,
+    domain: String,
+    token: String,
+    username: Option<String>,
+) -> Result<(), String> {
+    log::debug!("存储访问令牌: {}", domain);
+
+    let token_config = TokenConfig {
+        domain: domain.clone(),
+        token,
+        username,
+        created_at: chrono::Utc::now().timestamp(),
+        last_used: None,
+    };
+
+    // 使用Tauri Store API存储token
+    let store = StoreBuilder::new(&app_handle, "tokens.dat").build();
+
+    match store {
+        Ok(store) => {
+            store.set(domain.clone(), serde_json::to_value(&token_config).unwrap());
+            match store.save() {
+                Ok(_) => {
+                    log::info!("Token存储成功: {}", domain);
+                    Ok(())
+                }
+                Err(e) => {
+                    log::error!("Token存储失败: {}", e);
+                    Err(format!("Token存储失败: {}", e))
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("无法创建存储: {}", e);
+            Err(format!("无法创建存储: {}", e))
+        }
+    }
+}
+
+/// 获取Personal Access Token
+#[command]
+pub async fn get_access_token(
+    app_handle: AppHandle,
+    domain: String,
+) -> Result<Option<TokenConfig>, String> {
+    log::debug!("获取访问令牌: {}", domain);
+
+    let store = StoreBuilder::new(&app_handle, "tokens.dat").build();
+
+    match store {
+        Ok(store) => {
+            if let Some(value) = store.get(&domain) {
+                match serde_json::from_value::<TokenConfig>(value.clone()) {
+                    Ok(token_config) => {
+                        log::debug!("找到Token: {}", domain);
+                        Ok(Some(token_config))
+                    }
+                    Err(e) => {
+                        log::error!("Token反序列化失败: {}", e);
+                        Err(format!("Token反序列化失败: {}", e))
+                    }
+                }
+            } else {
+                log::debug!("未找到Token: {}", domain);
+                Ok(None)
+            }
+        }
+        Err(e) => {
+            log::error!("无法读取存储: {}", e);
+            Err(format!("无法读取存储: {}", e))
+        }
+    }
+}
+
+/// 删除Personal Access Token
+#[command]
+pub async fn delete_access_token(app_handle: AppHandle, domain: String) -> Result<(), String> {
+    log::debug!("删除访问令牌: {}", domain);
+
+    let store = StoreBuilder::new(&app_handle, "tokens.dat").build();
+
+    match store {
+        Ok(store) => {
+            store.delete(&domain);
+            match store.save() {
+                Ok(_) => {
+                    log::info!("Token删除成功: {}", domain);
+                    Ok(())
+                }
+                Err(e) => {
+                    log::error!("Token删除失败: {}", e);
+                    Err(format!("Token删除失败: {}", e))
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("无法创建存储: {}", e);
+            Err(format!("无法创建存储: {}", e))
+        }
+    }
+}
+
+/// 获取所有存储的Token
+#[command]
+pub async fn get_all_tokens(app_handle: AppHandle) -> Result<Vec<TokenConfig>, String> {
+    log::debug!("获取所有访问令牌");
+
+    let store = StoreBuilder::new(&app_handle, "tokens.dat").build();
+
+    match store {
+        Ok(store) => {
+            let mut tokens = Vec::new();
+
+            for (_, value) in store.entries() {
+                match serde_json::from_value::<TokenConfig>(value.clone()) {
+                    Ok(token_config) => tokens.push(token_config),
+                    Err(e) => log::warn!("跳过无效的Token配置: {}", e),
+                }
+            }
+
+            log::debug!("找到 {} 个Token", tokens.len());
+            Ok(tokens)
+        }
+        Err(e) => {
+            log::error!("无法读取存储: {}", e);
+            Err(format!("无法读取存储: {}", e))
+        }
+    }
+}
+
+/// 更新Token的最后使用时间
+#[command]
+pub async fn update_token_last_used(app_handle: AppHandle, domain: String) -> Result<(), String> {
+    log::debug!("更新Token最后使用时间: {}", domain);
+
+    // 获取现有Token
+    if let Ok(Some(mut token_config)) = get_access_token(app_handle.clone(), domain.clone()).await {
+        token_config.last_used = Some(chrono::Utc::now().timestamp());
+
+        // 重新存储
+        store_access_token(
+            app_handle,
+            token_config.domain,
+            token_config.token,
+            token_config.username,
+        )
+        .await
+    } else {
+        Err("Token不存在".to_string())
+    }
+}
+
+// ==================== 系统Git命令实现 ====================
+
+/// 使用系统Git命令执行fetch操作（用于SSH协议）
+#[command]
+pub async fn fetch_remote_with_system_git(
+    repo_path: String,
+    remote_name: Option<String>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "使用系统Git执行fetch: {} (remote: {:?})",
+        repo_path,
+        remote_name
+    );
+
+    let remote = if let Some(name) = remote_name {
+        name
+    } else {
+        // 动态检测默认远程名称
+        match detect_default_remote_name(&repo_path).await {
+            Ok(name) => name,
+            Err(e) => {
+                log::error!("检测默认远程名称失败: {}", e);
+                return Err(format!("检测默认远程名称失败: {}", e));
+            }
+        }
+    };
+
+    let output = tokio::process::Command::new("git")
+        .arg("fetch")
+        .arg(&remote)
+        .current_dir(&repo_path)
+        .output()
+        .await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                // 获取ahead/behind状态
+                let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
+
+                Ok(crate::git::types::SyncResult {
+                    success: true,
+                    message: "成功获取远程变更".to_string(),
+                    has_conflicts: false,
+                    conflict_files: vec![],
+                    ahead: ahead.max(0) as u32,
+                    behind: behind.max(0) as u32,
+                })
+            } else {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+                log::error!("Git fetch失败: {}", error_msg);
+                Err(format!("Git fetch失败: {}", error_msg))
+            }
+        }
+        Err(e) => {
+            log::error!("执行Git命令失败: {}", e);
+            Err(format!("执行Git命令失败: {}", e))
+        }
+    }
+}
+
+/// 使用系统Git命令执行push操作（用于SSH协议）
+#[command]
+pub async fn push_remote_with_system_git(
+    repo_path: String,
+    remote_name: Option<String>,
+    force: Option<bool>,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "使用系统Git执行push: {} (remote: {:?}, force: {:?})",
+        repo_path,
+        remote_name,
+        force
+    );
+
+    let remote = if let Some(name) = remote_name {
+        name
+    } else {
+        // 动态检测默认远程名称
+        match detect_default_remote_name(&repo_path).await {
+            Ok(name) => name,
+            Err(e) => {
+                log::error!("检测默认远程名称失败: {}", e);
+                return Err(format!("检测默认远程名称失败: {}", e));
+            }
+        }
+    };
+    let force_flag = force.unwrap_or(false);
+
+    // 获取当前分支
+    let current_branch = get_current_branch_with_git(&repo_path).await?;
+
+    let mut cmd = tokio::process::Command::new("git");
+    cmd.arg("push");
+
+    if force_flag {
+        cmd.arg("--force");
+    }
+
+    cmd.arg(&remote)
+        .arg(&current_branch)
+        .current_dir(&repo_path);
+
+    let output = cmd.output().await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                // 获取ahead/behind状态
+                let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
+
+                Ok(crate::git::types::SyncResult {
+                    success: true,
+                    message: "成功推送到远程仓库".to_string(),
+                    has_conflicts: false,
+                    conflict_files: vec![],
+                    ahead: ahead.max(0) as u32,
+                    behind: behind.max(0) as u32,
+                })
+            } else {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+                log::error!("Git push失败: {}", error_msg);
+                Err(format!("Git push失败: {}", error_msg))
+            }
+        }
+        Err(e) => {
+            log::error!("执行Git命令失败: {}", e);
+            Err(format!("执行Git命令失败: {}", e))
+        }
+    }
+}
+
+/// 使用系统Git命令执行pull操作（用于SSH协议）
+#[command]
+pub async fn pull_remote_with_system_git(
+    repo_path: String,
+    strategy: String,
+) -> Result<crate::git::types::SyncResult, String> {
+    log::debug!(
+        "使用系统Git执行pull: {} (strategy: {})",
+        repo_path,
+        strategy
+    );
+
+    let mut cmd = tokio::process::Command::new("git");
+    cmd.arg("pull");
+
+    match strategy.as_str() {
+        "rebase" => {
+            cmd.arg("--rebase");
+        }
+        "merge" => {
+            // 默认行为，不需要额外参数
+        }
+        _ => {
+            return Err("无效的拉取策略，支持: merge, rebase".to_string());
+        }
+    }
+
+    cmd.current_dir(&repo_path);
+
+    let output = cmd.output().await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                // 获取ahead/behind状态
+                let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
+
+                Ok(crate::git::types::SyncResult {
+                    success: true,
+                    message: "成功拉取远程变更".to_string(),
+                    has_conflicts: false,
+                    conflict_files: vec![],
+                    ahead: ahead.max(0) as u32,
+                    behind: behind.max(0) as u32,
+                })
+            } else {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+
+                // 检查是否有冲突
+                if error_msg.contains("CONFLICT") || error_msg.contains("conflict") {
+                    // 获取冲突文件列表
+                    let conflict_files = get_conflict_files_with_git(&repo_path).await?;
+
+                    Ok(crate::git::types::SyncResult {
+                        success: false,
+                        message: "拉取时发现冲突".to_string(),
+                        has_conflicts: true,
+                        conflict_files,
+                        ahead: 0,
+                        behind: 0,
+                    })
+                } else {
+                    log::error!("Git pull失败: {}", error_msg);
+                    Err(format!("Git pull失败: {}", error_msg))
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("执行Git命令失败: {}", e);
+            Err(format!("执行Git命令失败: {}", e))
+        }
+    }
+}
+
+// ==================== 辅助函数 ====================
+
+/// 使用系统Git命令获取ahead/behind状态
+async fn get_ahead_behind_with_git(repo_path: &str) -> Result<(i32, i32), String> {
+    let output = tokio::process::Command::new("git")
+        .arg("rev-list")
+        .arg("--left-right")
+        .arg("--count")
+        .arg("HEAD...@{upstream}")
+        .current_dir(repo_path)
+        .output()
+        .await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                let result = String::from_utf8_lossy(&output.stdout);
+                let parts: Vec<&str> = result.trim().split('\t').collect();
+
+                if parts.len() == 2 {
+                    let ahead = parts[0].parse::<i32>().unwrap_or(0);
+                    let behind = parts[1].parse::<i32>().unwrap_or(0);
+                    Ok((ahead, behind))
+                } else {
+                    Ok((0, 0))
+                }
+            } else {
+                // 如果没有upstream，返回0
+                Ok((0, 0))
+            }
+        }
+        Err(_) => Ok((0, 0)),
+    }
+}
+
+/// 使用系统Git命令获取当前分支
+async fn get_current_branch_with_git(repo_path: &str) -> Result<String, String> {
+    let output = tokio::process::Command::new("git")
+        .arg("branch")
+        .arg("--show-current")
+        .current_dir(repo_path)
+        .output()
+        .await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if branch.is_empty() {
+                    Err("无法获取当前分支".to_string())
+                } else {
+                    Ok(branch)
+                }
+            } else {
+                Err("获取当前分支失败".to_string())
+            }
+        }
+        Err(e) => Err(format!("执行Git命令失败: {}", e)),
+    }
+}
+
+/// 使用系统Git命令获取冲突文件列表
+async fn get_conflict_files_with_git(repo_path: &str) -> Result<Vec<String>, String> {
+    let output = tokio::process::Command::new("git")
+        .arg("diff")
+        .arg("--name-only")
+        .arg("--diff-filter=U")
+        .current_dir(repo_path)
+        .output()
+        .await;
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                let files = String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .map(|line| line.trim().to_string())
+                    .filter(|line| !line.is_empty())
+                    .collect();
+                Ok(files)
+            } else {
+                Ok(vec![])
+            }
+        }
+        Err(_) => Ok(vec![]),
+    }
+}
+
+/// 检测并验证仓库的远程配置
+#[command]
+pub async fn detect_repository_remotes(repo_path: String) -> Result<Vec<String>, String> {
+    log::debug!("检测仓库远程配置: {}", repo_path);
+
+    match git2::Repository::open(&repo_path) {
+        Ok(repo) => match repo.remotes() {
+            Ok(remotes) => {
+                let remote_list: Vec<String> =
+                    remotes.iter().flatten().map(|s| s.to_string()).collect();
+                log::debug!("找到远程列表: {:?}", remote_list);
+
+                if remote_list.is_empty() {
+                    Err("仓库中没有配置任何远程仓库".to_string())
+                } else {
+                    Ok(remote_list)
+                }
+            }
+            Err(e) => {
+                log::error!("获取远程列表失败: {}", e);
+                Err(format!("获取远程列表失败: {}", e))
+            }
+        },
+        Err(e) => {
+            log::error!("打开仓库失败: {}", e);
+            Err(format!("打开仓库失败: {}", e))
+        }
+    }
+}
+
+/// 获取仓库的默认远程名称
+#[command]
+pub async fn get_default_remote_name_command(repo_path: String) -> Result<String, String> {
+    log::debug!("获取默认远程名称: {}", repo_path);
+
+    match detect_default_remote_name(&repo_path).await {
+        Ok(remote_name) => {
+            log::debug!("默认远程名称: {}", remote_name);
+            Ok(remote_name)
+        }
+        Err(e) => {
+            log::error!("获取默认远程名称失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+// ==================== 远程名称检测辅助函数 ====================
+
+/// 检测仓库的默认远程名称
+async fn detect_default_remote_name(repo_path: &str) -> Result<String, String> {
+    log::debug!("检测仓库默认远程名称: {}", repo_path);
+
+    // 使用git2库检测远程名称
+    match git2::Repository::open(repo_path) {
+        Ok(repo) => match crate::git::operations::get_default_remote_name(&repo) {
+            Ok(remote_name) => {
+                log::debug!("检测到默认远程名称: {}", remote_name);
+                Ok(remote_name)
+            }
+            Err(e) => {
+                log::error!("使用git2检测远程名称失败: {}", e);
+                Err(format!("检测远程名称失败: {}", e))
+            }
+        },
+        Err(e) => {
+            log::error!("打开仓库失败: {}", e);
+            Err(format!("打开仓库失败: {}", e))
+        }
+    }
+}
+
+// ==================== Token认证辅助函数 ====================
+
+/// 获取仓库的远程URL（内部辅助函数）
+async fn get_repository_remote_url(repo_path: String) -> Result<Option<String>, String> {
+    match crate::git::operations::get_remote_info(&repo_path) {
+        Ok(remote_info) => {
+            // 这里需要实际获取远程URL，暂时返回None
+            // 在实际实现中，应该从git2库获取远程URL
+            log::debug!("获取远程信息成功: {:?}", remote_info);
+
+            // 尝试使用git2获取远程URL
+            match git2::Repository::open(&repo_path) {
+                Ok(repo) => {
+                    if let Ok(remote) = repo.find_remote(&remote_info.remote_name) {
+                        if let Some(url) = remote.url() {
+                            return Ok(Some(url.to_string()));
+                        }
+                    }
+                    Ok(None)
+                }
+                Err(_) => Ok(None),
+            }
+        }
+        Err(e) => {
+            log::error!("获取远程信息失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 为指定仓库获取Token
+async fn get_token_for_repository(
+    app_handle: &AppHandle,
+    repo_path: &str,
+) -> Result<Option<String>, String> {
+    // 获取远程URL
+    let remote_url = match get_repository_remote_url(repo_path.to_string()).await? {
+        Some(url) => url,
+        None => {
+            log::debug!("未找到远程URL");
+            return Ok(None);
+        }
+    };
+
+    log::debug!("仓库远程URL: {}", remote_url);
+
+    // 检查是否是HTTPS协议
+    if !remote_url.starts_with("https://") && !remote_url.starts_with("http://") {
+        log::debug!("非HTTPS协议，不需要Token认证");
+        return Ok(None);
+    }
+
+    // 从URL提取域名
+    let domain = match extract_domain_from_url(remote_url).await {
+        Ok(domain) => domain,
+        Err(e) => {
+            log::warn!("提取域名失败: {}", e);
+            return Ok(None);
+        }
+    };
+
+    log::debug!("提取到域名: {}", domain);
+
+    // 获取对应的Token
+    match get_access_token(app_handle.clone(), domain.clone()).await {
+        Ok(Some(token_config)) => {
+            log::debug!("找到Token配置: {}", domain);
+
+            // 更新最后使用时间
+            let _ = update_token_last_used(app_handle.clone(), domain).await;
+
+            Ok(Some(token_config.token))
+        }
+        Ok(None) => {
+            log::debug!("未找到Token配置: {}", domain);
+            Ok(None)
+        }
+        Err(e) => {
+            log::error!("获取Token失败: {}", e);
+            Err(e)
         }
     }
 }

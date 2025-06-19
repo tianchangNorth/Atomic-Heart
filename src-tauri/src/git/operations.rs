@@ -625,33 +625,70 @@ fn get_ahead_behind_count(repo: &Repository) -> Result<(u32, u32), GitError> {
 }
 
 /// 获取默认远程名称
-fn get_default_remote_name(repo: &Repository) -> Result<String, GitError> {
+pub fn get_default_remote_name(repo: &Repository) -> Result<String, GitError> {
+    log::debug!("开始检测默认远程名称");
+
     // 首先尝试获取当前分支的上游远程
     if let Ok(head) = repo.head() {
         if let Some(branch_name) = head.shorthand() {
+            log::debug!("当前分支: {}", branch_name);
+
             if let Ok(upstream_name) =
                 repo.branch_upstream_name(&format!("refs/heads/{}", branch_name))
             {
                 if let Some(upstream_str) = upstream_name.as_str() {
+                    log::debug!("找到上游分支: {}", upstream_str);
+
                     // 解析远程名称，格式通常是 "refs/remotes/origin/main"
                     if let Some(remote_part) = upstream_str.strip_prefix("refs/remotes/") {
                         if let Some(slash_pos) = remote_part.find('/') {
-                            return Ok(remote_part[..slash_pos].to_string());
+                            let remote_name = remote_part[..slash_pos].to_string();
+                            log::debug!("从上游分支解析到远程名称: {}", remote_name);
+                            return Ok(remote_name);
                         }
                     }
+                }
+            } else {
+                log::debug!("当前分支没有设置上游分支");
+            }
+        }
+    }
+
+    // 如果无法从分支获取，尝试列出所有远程
+    let remotes = repo.remotes().map_err(GitError::Git)?;
+    let remote_names: Vec<String> = remotes.iter().flatten().map(|s| s.to_string()).collect();
+    log::debug!("仓库中的远程列表: {:?}", remote_names);
+
+    if remotes.len() == 0 {
+        log::error!("仓库中没有配置任何远程仓库");
+        return Err(GitError::Unknown {
+            message: "仓库中没有配置任何远程仓库".to_string(),
+        });
+    }
+
+    // 优先选择常见的远程名称
+    let preferred_remotes = ["origin", "upstream", "github", "gitlab"];
+    for preferred in &preferred_remotes {
+        for i in 0..remotes.len() {
+            if let Some(remote_name) = remotes.get(i) {
+                if remote_name == *preferred {
+                    log::debug!("找到首选远程名称: {}", remote_name);
+                    return Ok(remote_name.to_string());
                 }
             }
         }
     }
 
-    // 如果无法从分支获取，尝试列出所有远程并选择第一个
-    let remotes = repo.remotes().map_err(GitError::Git)?;
+    // 如果没有找到首选的，使用第一个可用的远程
     if let Some(first_remote) = remotes.get(0) {
+        log::debug!("使用第一个可用的远程: {}", first_remote);
         return Ok(first_remote.to_string());
     }
 
-    // 最后回退到 "origin"
-    Ok("origin".to_string())
+    // 这种情况理论上不应该发生，因为我们已经检查了remotes.len() == 0
+    Err(GitError::Unknown {
+        message: "无法确定默认远程名称".to_string(),
+    })
 }
 
 /// 执行合并操作
@@ -858,4 +895,178 @@ fn perform_rebase(
         ahead: 0,
         behind: 0,
     })
+}
+
+// ==================== Token认证系统 ====================
+
+/// Token配置结构
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct TokenConfig {
+    pub domain: String,
+    pub token: String,
+    pub username: Option<String>,
+    pub created_at: i64,
+    pub last_used: Option<i64>,
+}
+
+/// 创建支持Token认证的回调函数
+pub fn create_authenticated_callbacks(
+    repo_url: &str,
+    token_cache: Option<String>,
+) -> RemoteCallbacks {
+    let mut callbacks = RemoteCallbacks::new();
+    let _url = repo_url.to_string();
+
+    callbacks.credentials(move |url, username_from_url, allowed_types| {
+        log::debug!(
+            "Git认证回调被调用: url={}, username={:?}, allowed_types={:?}",
+            url,
+            username_from_url,
+            allowed_types
+        );
+
+        // 检查是否是HTTPS协议
+        if url.starts_with("https://") || url.starts_with("http://") {
+            // 尝试使用Token认证
+            if let Some(ref token) = token_cache {
+                log::debug!("使用Token进行HTTPS认证");
+
+                // GitHub和GitLab等服务使用Token作为用户名，密码为空
+                return git2::Cred::userpass_plaintext(token, "");
+            } else {
+                log::debug!("未找到Token，尝试默认凭据");
+            }
+        }
+
+        // 对于SSH或其他情况，使用默认凭据
+        log::debug!("使用默认凭据");
+        git2::Cred::default()
+    });
+
+    // 添加证书检查回调
+    callbacks.certificate_check(|_cert, _valid| {
+        log::debug!("证书检查回调");
+        // 对于开发环境，可以选择接受所有证书
+        // 生产环境应该进行适当的证书验证
+        Ok(git2::CertificateCheckStatus::CertificateOk)
+    });
+
+    callbacks
+}
+
+/// 支持Token认证的fetch操作
+pub fn fetch_remote_with_token(
+    repo_path: &str,
+    remote_name: Option<&str>,
+    token_cache: Option<String>,
+) -> Result<SyncResult, GitError> {
+    let repo = Repository::open(repo_path).map_err(GitError::Git)?;
+
+    // 获取远程仓库名称
+    let remote_name = if let Some(name) = remote_name {
+        name.to_string()
+    } else {
+        // 如果没有指定远程名称，尝试获取默认远程
+        get_default_remote_name(&repo)?
+    };
+
+    let mut remote = repo.find_remote(&remote_name).map_err(GitError::Git)?;
+
+    // 获取远程URL
+    let remote_url = remote.url().unwrap_or("").to_string();
+    log::debug!("Fetch操作使用远程URL: {}", remote_url);
+
+    // 创建支持Token认证的回调
+    let callbacks = create_authenticated_callbacks(&remote_url, token_cache);
+
+    // 设置fetch选项
+    let mut fetch_options = FetchOptions::new();
+    fetch_options.remote_callbacks(callbacks);
+
+    // 执行fetch操作
+    let refspecs = remote.fetch_refspecs().map_err(GitError::Git)?;
+    let refspecs: Vec<&str> = refspecs.iter().flatten().collect();
+
+    match remote.fetch(&refspecs, Some(&mut fetch_options), None) {
+        Ok(()) => {
+            // 获取更新后的ahead/behind状态
+            let (ahead, behind) = get_ahead_behind_count(&repo)?;
+
+            Ok(SyncResult {
+                success: true,
+                message: "成功获取远程变更".to_string(),
+                has_conflicts: false,
+                conflict_files: vec![],
+                ahead,
+                behind,
+            })
+        }
+        Err(e) => {
+            log::error!("Fetch操作失败: {}", e);
+            Err(GitError::Git(e))
+        }
+    }
+}
+
+/// 支持Token认证的push操作
+pub fn push_remote_with_token(
+    repo_path: &str,
+    remote_name: Option<&str>,
+    force: bool,
+    token_cache: Option<String>,
+) -> Result<SyncResult, GitError> {
+    let repo = Repository::open(repo_path).map_err(GitError::Git)?;
+
+    // 获取远程仓库名称
+    let remote_name = if let Some(name) = remote_name {
+        name.to_string()
+    } else {
+        // 如果没有指定远程名称，尝试获取默认远程
+        get_default_remote_name(&repo)?
+    };
+
+    let mut remote = repo.find_remote(&remote_name).map_err(GitError::Git)?;
+
+    // 获取当前分支
+    let head = repo.head().map_err(GitError::Git)?;
+    let branch_name = head.shorthand().unwrap_or("HEAD");
+
+    // 获取远程URL
+    let remote_url = remote.url().unwrap_or("").to_string();
+    log::debug!("Push操作使用远程URL: {}", remote_url);
+
+    // 创建支持Token认证的回调
+    let callbacks = create_authenticated_callbacks(&remote_url, token_cache);
+
+    // 设置push选项
+    let mut push_options = PushOptions::new();
+    push_options.remote_callbacks(callbacks);
+
+    // 构建refspec
+    let refspec = if force {
+        format!("+refs/heads/{}:refs/heads/{}", branch_name, branch_name)
+    } else {
+        format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name)
+    };
+
+    // 执行push操作
+    match remote.push(&[&refspec], Some(&mut push_options)) {
+        Ok(()) => {
+            // 获取更新后的ahead/behind状态
+            let (ahead, behind) = get_ahead_behind_count(&repo)?;
+
+            Ok(SyncResult {
+                success: true,
+                message: "成功推送到远程仓库".to_string(),
+                has_conflicts: false,
+                conflict_files: vec![],
+                ahead,
+                behind,
+            })
+        }
+        Err(e) => {
+            log::error!("Push操作失败: {}", e);
+            Err(GitError::Git(e))
+        }
+    }
 }

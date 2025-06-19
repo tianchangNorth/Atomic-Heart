@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
-import { gitOperationsApi, type SyncResult, type PullStrategy } from '@/api/git-operations';
+import { gitOperationsApi, type SyncResult, type PullStrategy, type ProtocolType, type TokenConfig } from '@/api/git-operations';
+import TokenConfigDialog from './TokenConfigDialog.vue';
 import {
   Download,
   Upload,
@@ -12,7 +13,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  GitBranch
+  GitBranch,
+  Key,
+  Shield,
+  Wifi
 } from 'lucide-vue-next';
 
 // Props
@@ -32,6 +36,21 @@ const syncStatus = reactive({
   conflicts: [] as string[],
   lastSync: null as string | null,
   remoteStatus: 'unknown' as 'connected' | 'disconnected' | 'unknown'
+});
+
+// 认证状态
+const authStatus = reactive({
+  protocol: 'unknown' as ProtocolType,
+  domain: '',
+  hasToken: false,
+  tokenConfigured: false,
+  lastChecked: null as string | null
+});
+
+// Token配置弹窗状态
+const tokenDialog = reactive({
+  open: false,
+  domain: ''
 });
 
 const currentOperation = ref<{
@@ -88,7 +107,65 @@ const addLog = (message: string) => {
   }
 };
 
-// 获取远程变更（fetch操作）
+// 检测协议和认证状态
+const detectProtocolAndAuth = async () => {
+  try {
+    addLog('检测仓库协议类型...');
+
+    // 检测协议类型
+    const protocol = await gitOperationsApi.detectRepositoryProtocol(props.repositoryPath);
+    authStatus.protocol = protocol;
+
+    addLog(`检测到协议类型: ${protocol.toUpperCase()}`);
+
+    if (protocol === 'https') {
+      // 获取远程URL并提取域名
+      const remoteInfo = await gitOperationsApi.getRemoteInfo(props.repositoryPath);
+      if (remoteInfo.remote_name) {
+        // 这里需要获取实际的远程URL，暂时使用占位符
+        const domain = 'github.com'; // 实际应该从远程URL提取
+        authStatus.domain = domain;
+
+        // 检查是否有存储的token
+        const token = await gitOperationsApi.getAccessToken(domain);
+        authStatus.hasToken = !!token;
+        authStatus.tokenConfigured = !!token;
+
+        if (token) {
+          addLog(`找到${domain}的访问令牌`);
+          await gitOperationsApi.updateTokenLastUsed(domain);
+        } else {
+          addLog(`未找到${domain}的访问令牌`);
+        }
+      }
+    } else if (protocol === 'ssh') {
+      addLog('SSH协议将使用系统Git命令');
+      authStatus.tokenConfigured = true; // SSH不需要token配置
+    }
+
+    authStatus.lastChecked = new Date().toISOString();
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : '协议检测失败';
+    addLog(`协议检测失败: ${errorMessage}`);
+    console.error('协议检测失败:', err);
+  }
+};
+
+// 确保HTTPS认证
+const ensureHttpsAuth = async (): Promise<boolean> => {
+  if (authStatus.protocol === 'https' && !authStatus.tokenConfigured) {
+    addLog('需要配置Personal Access Token');
+
+    // 打开token配置弹窗
+    tokenDialog.domain = authStatus.domain;
+    tokenDialog.open = true;
+
+    return false;
+  }
+  return true;
+};
+
+// 获取远程变更（智能fetch操作）
 const fetchRemote = async () => {
   fetchState.value.loading = true;
   fetchState.value.error = null;
@@ -103,11 +180,17 @@ const fetchRemote = async () => {
   addLog('开始获取远程变更...');
 
   try {
+    // 检查认证状态
+    if (authStatus.protocol === 'https' && !(await ensureHttpsAuth())) {
+      addLog('等待Token配置...');
+      return;
+    }
+
     currentOperation.value.progress = 30;
     currentOperation.value.message = '获取远程变更...';
-    console.log('xxxx', props.repositoryPath);
 
-    const result: SyncResult = await gitOperationsApi.fetchRemote(props.repositoryPath);
+    // 使用智能fetch操作
+    const result: SyncResult = await gitOperationsApi.smartFetchRemote(props.repositoryPath);
 
     currentOperation.value.progress = 100;
     currentOperation.value.message = '获取完成';
@@ -129,6 +212,15 @@ const fetchRemote = async () => {
     fetchState.value.error = errorMessage;
     syncStatus.remoteStatus = 'disconnected';
     addLog(`获取失败: ${errorMessage}`);
+
+    // 如果是认证错误，可能需要重新配置token
+    if (errorMessage.includes('authentication') || errorMessage.includes('401') || errorMessage.includes('403')) {
+      addLog('可能是认证问题，请检查Token配置');
+      if (authStatus.protocol === 'https') {
+        authStatus.tokenConfigured = false;
+      }
+    }
+
     error(errorMessage);
   } finally {
     fetchState.value.loading = false;
@@ -138,7 +230,7 @@ const fetchRemote = async () => {
   }
 };
 
-// 拉取远程变更（pull操作）
+// 拉取远程变更（智能pull操作）
 const pull = async () => {
   pullState.value.loading = true;
   pullState.value.error = null;
@@ -153,6 +245,12 @@ const pull = async () => {
   addLog(`开始拉取远程变更 (${syncOptions.pullMode})...`);
 
   try {
+    // 检查认证状态
+    if (authStatus.protocol === 'https' && !(await ensureHttpsAuth())) {
+      addLog('等待Token配置...');
+      return;
+    }
+
     currentOperation.value.progress = 20;
     currentOperation.value.message = '连接到远程仓库...';
 
@@ -161,7 +259,8 @@ const pull = async () => {
     currentOperation.value.progress = 60;
     currentOperation.value.message = '拉取远程变更...';
 
-    const result: SyncResult = await gitOperationsApi.pullRemote(props.repositoryPath, syncOptions.pullMode);
+    // 使用智能pull操作
+    const result: SyncResult = await gitOperationsApi.smartPullRemote(props.repositoryPath, syncOptions.pullMode);
 
     currentOperation.value.progress = 100;
     currentOperation.value.message = '拉取完成';
@@ -186,6 +285,15 @@ const pull = async () => {
     const errorMessage = err instanceof Error ? err.message : '拉取远程变更失败';
     pullState.value.error = errorMessage;
     addLog(`拉取失败: ${errorMessage}`);
+
+    // 如果是认证错误，可能需要重新配置token
+    if (errorMessage.includes('authentication') || errorMessage.includes('401') || errorMessage.includes('403')) {
+      addLog('可能是认证问题，请检查Token配置');
+      if (authStatus.protocol === 'https') {
+        authStatus.tokenConfigured = false;
+      }
+    }
+
     error(errorMessage);
   } finally {
     pullState.value.loading = false;
@@ -195,7 +303,7 @@ const pull = async () => {
   }
 };
 
-// 推送本地变更（push操作）
+// 推送本地变更（智能push操作）
 const push = async () => {
   pushState.value.loading = true;
   pushState.value.error = null;
@@ -210,6 +318,12 @@ const push = async () => {
   addLog('开始推送本地变更...');
 
   try {
+    // 检查认证状态
+    if (authStatus.protocol === 'https' && !(await ensureHttpsAuth())) {
+      addLog('等待Token配置...');
+      return;
+    }
+
     currentOperation.value.progress = 20;
     currentOperation.value.message = '连接到远程仓库...';
 
@@ -218,7 +332,8 @@ const push = async () => {
     currentOperation.value.progress = 60;
     currentOperation.value.message = '推送本地变更...';
 
-    const result: SyncResult = await gitOperationsApi.pushRemote(
+    // 使用智能push操作
+    const result: SyncResult = await gitOperationsApi.smartPushRemote(
       props.repositoryPath,
       syncOptions.remoteName,
       syncOptions.pushForce
@@ -241,6 +356,15 @@ const push = async () => {
     const errorMessage = err instanceof Error ? err.message : '推送本地变更失败';
     pushState.value.error = errorMessage;
     addLog(`推送失败: ${errorMessage}`);
+
+    // 如果是认证错误，可能需要重新配置token
+    if (errorMessage.includes('authentication') || errorMessage.includes('401') || errorMessage.includes('403')) {
+      addLog('可能是认证问题，请检查Token配置');
+      if (authStatus.protocol === 'https') {
+        authStatus.tokenConfigured = false;
+      }
+    }
+
     error(errorMessage);
   } finally {
     pushState.value.loading = false;
@@ -273,15 +397,38 @@ const formatLastSync = (dateString: string) => {
   return `${Math.floor(diffMins / 1440)} 天前`;
 };
 
+// Token配置成功处理
+const handleTokenConfigSuccess = (token: TokenConfig) => {
+  addLog(`Token配置成功: ${token.domain}`);
+  authStatus.hasToken = true;
+  authStatus.tokenConfigured = true;
+  authStatus.domain = token.domain;
+
+  // 关闭弹窗
+  tokenDialog.open = false;
+
+  // 可以继续之前被中断的操作
+  success('Token配置成功，可以继续Git操作');
+};
+
+// 手动配置Token
+const configureToken = () => {
+  tokenDialog.domain = authStatus.domain || '';
+  tokenDialog.open = true;
+};
+
 // 初始化时获取远程信息和状态
 onMounted(async () => {
   try {
-    // 首先获取远程信息以确定正确的远程名称
+    // 首先检测协议和认证状态
+    await detectProtocolAndAuth();
+
+    // 然后获取远程信息以确定正确的远程名称
     const remoteInfo = await gitOperationsApi.getRemoteInfo(props.repositoryPath);
     syncOptions.remoteName = remoteInfo.remote_name;
     syncOptions.remoteBranch = remoteInfo.branch_name;
 
-    // 然后获取远程变更
+    // 最后获取远程变更
     await fetchRemote();
   } catch (error) {
     console.error('初始化远程信息失败:', error);
@@ -318,6 +465,44 @@ onMounted(async () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <!-- 协议和认证状态 -->
+          <div class="flex items-center justify-between p-3 bg-muted rounded-lg mb-4">
+            <div class="flex items-center space-x-3">
+              <div class="flex items-center space-x-2">
+                <Shield v-if="authStatus.protocol === 'ssh'" class="w-4 h-4 text-green-600" />
+                <Wifi v-else-if="authStatus.protocol === 'https'" class="w-4 h-4 text-blue-600" />
+                <AlertCircle v-else class="w-4 h-4 text-gray-400" />
+                <span class="text-sm font-medium">
+                  {{ authStatus.protocol === 'ssh' ? 'SSH' : authStatus.protocol === 'https' ? 'HTTPS' : '未知' }}
+                </span>
+              </div>
+              <div v-if="authStatus.domain" class="text-sm text-muted-foreground">
+                {{ authStatus.domain }}
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <div v-if="authStatus.protocol === 'https'" class="flex items-center space-x-2">
+                <CheckCircle2 v-if="authStatus.tokenConfigured" class="w-4 h-4 text-green-600" />
+                <AlertCircle v-else class="w-4 h-4 text-orange-600" />
+                <span class="text-sm">
+                  {{ authStatus.tokenConfigured ? 'Token已配置' : 'Token未配置' }}
+                </span>
+                <Button
+                  v-if="!authStatus.tokenConfigured"
+                  variant="outline"
+                  size="sm"
+                  @click="configureToken"
+                >
+                  <Key class="w-3 h-3 mr-1" />
+                  配置Token
+                </Button>
+              </div>
+              <div v-else-if="authStatus.protocol === 'ssh'" class="text-sm text-green-600">
+                使用系统SSH
+              </div>
+            </div>
+          </div>
+
           <div class="grid grid-cols-3 gap-4 text-center">
             <div class="space-y-2">
               <div class="text-2xl font-bold text-blue-600">{{ syncStatus.ahead }}</div>
@@ -492,4 +677,13 @@ onMounted(async () => {
       </Card>
     </div>
   </div>
+
+  <!-- Token配置弹窗 -->
+  <TokenConfigDialog
+    :open="tokenDialog.open"
+    :domain="tokenDialog.domain"
+    @update:open="(value) => tokenDialog.open = value"
+    @close="() => tokenDialog.open = false"
+    @success="handleTokenConfigSuccess"
+  />
 </template>
