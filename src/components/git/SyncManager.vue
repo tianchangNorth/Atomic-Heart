@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
-import { gitOperationsApi, type SyncResult, type PullStrategy, type RemoteBranchInfo } from '@/api/git-operations';
+import { gitOperationsApi, type SyncResult, type PullStrategy } from '@/api/git-operations';
 import {
   Download,
   Upload,

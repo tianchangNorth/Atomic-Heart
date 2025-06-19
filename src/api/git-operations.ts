@@ -256,7 +256,7 @@ export class GitOperationsApi {
   async getRemoteInfo(repoPath: string): Promise<RemoteBranchInfo> {
     try {
       const result = await invoke<RemoteBranchInfo>('get_remote_info', {
-        repo_path: repoPath
+        repoPath: repoPath
       });
       return result;
     } catch (error) {
