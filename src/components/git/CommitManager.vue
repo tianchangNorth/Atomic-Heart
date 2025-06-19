@@ -353,12 +353,11 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
             />
           </div>
 
-          <div v-else class="flex items-center justify-center flex-1 mt-10">
+          <div v-else class="flex items-center justify-center flex-1 mt-20">
             <div class="text-center text-muted-foreground">
               <FileText class="w-16 h-16 mx-auto mb-4 empty-state-icon" />
               <p class="text-lg font-medium">选择文件查看差异</p>
-              <p class="text-sm">点击右侧文件列表中的文件来查看详细变更</p>
-              <p class="text-xs text-muted-foreground mt-2">💡 左侧差异查看器为代码查看提供了更宽的显示空间</p>
+              <p class="text-sm">点击左侧文件列表中的文件来查看详细变更</p>
             </div>
           </div>
       </div>

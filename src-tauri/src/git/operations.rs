@@ -22,20 +22,39 @@ pub fn get_repository_status(repo_path: &str) -> Result<RepositoryStatus, GitErr
         let path = entry.path().unwrap_or("").to_string();
         let git_status = entry.status();
 
-        // 转换Git状态为我们的FileStatus
-        let status = convert_git_status(git_status);
-        let staged = is_staged(git_status);
+        // 检查是否有暂存的变更
+        let has_staged_changes = is_staged(git_status);
 
-        // 计算文件变更统计（简化版本）
-        let (additions, deletions) = calculate_file_stats(&repo, &path, staged)?;
+        // 检查是否有未暂存的变更
+        let has_unstaged_changes = has_unstaged_changes(git_status);
 
-        files.push(FileStatus {
-            path,
-            status,
-            staged,
-            additions,
-            deletions,
-        });
+        // 如果有暂存的变更，添加暂存条目
+        if has_staged_changes {
+            let status = convert_git_status_staged(git_status);
+            let (additions, deletions) = calculate_file_stats(&repo, &path, true)?;
+
+            files.push(FileStatus {
+                path: path.clone(),
+                status,
+                staged: true,
+                additions,
+                deletions,
+            });
+        }
+
+        // 如果有未暂存的变更，添加未暂存条目
+        if has_unstaged_changes {
+            let status = convert_git_status_unstaged(git_status);
+            let (additions, deletions) = calculate_file_stats(&repo, &path, false)?;
+
+            files.push(FileStatus {
+                path,
+                status,
+                staged: false,
+                additions,
+                deletions,
+            });
+        }
     }
 
     // 获取当前分支信息
@@ -275,20 +294,6 @@ pub fn get_file_diff(repo_path: &str, file_path: &str, staged: bool) -> Result<S
 
 // 辅助函数
 
-fn convert_git_status(status: Status) -> String {
-    if status.contains(Status::WT_NEW) || status.contains(Status::INDEX_NEW) {
-        "added".to_string()
-    } else if status.contains(Status::WT_MODIFIED) || status.contains(Status::INDEX_MODIFIED) {
-        "modified".to_string()
-    } else if status.contains(Status::WT_DELETED) || status.contains(Status::INDEX_DELETED) {
-        "deleted".to_string()
-    } else if status.contains(Status::WT_RENAMED) || status.contains(Status::INDEX_RENAMED) {
-        "renamed".to_string()
-    } else {
-        "untracked".to_string()
-    }
-}
-
 fn is_staged(status: Status) -> bool {
     status.contains(Status::INDEX_NEW)
         || status.contains(Status::INDEX_MODIFIED)
@@ -297,14 +302,91 @@ fn is_staged(status: Status) -> bool {
         || status.contains(Status::INDEX_TYPECHANGE)
 }
 
+fn has_unstaged_changes(status: Status) -> bool {
+    status.contains(Status::WT_NEW)
+        || status.contains(Status::WT_MODIFIED)
+        || status.contains(Status::WT_DELETED)
+        || status.contains(Status::WT_RENAMED)
+        || status.contains(Status::WT_TYPECHANGE)
+}
+
+fn convert_git_status_staged(status: Status) -> String {
+    if status.contains(Status::INDEX_NEW) {
+        "added".to_string()
+    } else if status.contains(Status::INDEX_MODIFIED) {
+        "modified".to_string()
+    } else if status.contains(Status::INDEX_DELETED) {
+        "deleted".to_string()
+    } else if status.contains(Status::INDEX_RENAMED) {
+        "renamed".to_string()
+    } else {
+        "modified".to_string()
+    }
+}
+
+fn convert_git_status_unstaged(status: Status) -> String {
+    if status.contains(Status::WT_NEW) {
+        "added".to_string()
+    } else if status.contains(Status::WT_MODIFIED) {
+        "modified".to_string()
+    } else if status.contains(Status::WT_DELETED) {
+        "deleted".to_string()
+    } else if status.contains(Status::WT_RENAMED) {
+        "renamed".to_string()
+    } else {
+        "modified".to_string()
+    }
+}
+
 fn calculate_file_stats(
-    _repo: &Repository,
-    _file_path: &str,
-    _staged: bool,
+    repo: &Repository,
+    file_path: &str,
+    staged: bool,
 ) -> Result<(u32, u32), GitError> {
-    // 简化版本：返回默认值
-    // 实际实现需要计算具体的行数变更
-    Ok((0, 0))
+    let mut diff_options = git2::DiffOptions::new();
+    diff_options.pathspec(file_path);
+
+    let diff = if staged {
+        // 暂存区与HEAD的差异
+        let head = match repo.head() {
+            Ok(head) => head,
+            Err(_) => return Ok((0, 0)), // 如果没有HEAD，返回默认值
+        };
+
+        let head_tree = head.peel_to_tree().map_err(|_| GitError::Unknown {
+            message: "无法获取HEAD树".to_string(),
+        })?;
+
+        let index = repo.index().map_err(GitError::Git)?;
+
+        repo.diff_tree_to_index(Some(&head_tree), Some(&index), Some(&mut diff_options))
+            .map_err(GitError::Git)?
+    } else {
+        // 工作区与暂存区的差异
+        repo.diff_index_to_workdir(None, Some(&mut diff_options))
+            .map_err(GitError::Git)?
+    };
+
+    // 计算添加和删除的行数
+    let mut additions = 0;
+    let mut deletions = 0;
+
+    diff.foreach(
+        &mut |_, _| true,
+        None,
+        None,
+        Some(&mut |_, _hunk, line| {
+            match line.origin() {
+                '+' => additions += 1,
+                '-' => deletions += 1,
+                _ => {}
+            }
+            true
+        }),
+    )
+    .map_err(GitError::Git)?;
+
+    Ok((additions, deletions))
 }
 
 fn get_current_branch(repo: &Repository) -> Result<String, GitError> {
@@ -320,8 +402,44 @@ fn get_current_branch(repo: &Repository) -> Result<String, GitError> {
     }
 }
 
-fn get_ahead_behind_count(_repo: &Repository) -> Result<(u32, u32), GitError> {
-    // 简化版本：返回默认值
-    // 实际实现需要比较本地分支与远程分支
-    Ok((0, 0))
+fn get_ahead_behind_count(repo: &Repository) -> Result<(u32, u32), GitError> {
+    // 获取当前分支
+    let head = match repo.head() {
+        Ok(head) => head,
+        Err(_) => return Ok((0, 0)), // 如果没有HEAD，返回默认值
+    };
+
+    // 获取当前分支名
+    let branch_name = match head.shorthand() {
+        Some(name) => name,
+        None => return Ok((0, 0)), // 如果无法获取分支名，返回默认值
+    };
+
+    // 查找对应的远程跟踪分支
+    let upstream_name = match repo.branch_upstream_name(&format!("refs/heads/{}", branch_name)) {
+        Ok(name) => name,
+        Err(_) => return Ok((0, 0)), // 如果没有上游分支，返回默认值
+    };
+
+    // 获取本地和远程分支的OID
+    let local_oid = head.target().ok_or_else(|| GitError::Unknown {
+        message: "无法获取本地分支OID".to_string(),
+    })?;
+
+    let upstream_ref = repo
+        .find_reference(upstream_name.as_str().unwrap())
+        .map_err(|_| GitError::Unknown {
+            message: "无法找到远程跟踪分支".to_string(),
+        })?;
+
+    let upstream_oid = upstream_ref.target().ok_or_else(|| GitError::Unknown {
+        message: "无法获取远程分支OID".to_string(),
+    })?;
+
+    // 计算领先/落后数量
+    let (ahead, behind) = repo
+        .graph_ahead_behind(local_oid, upstream_oid)
+        .map_err(GitError::Git)?;
+
+    Ok((ahead as u32, behind as u32))
 }
