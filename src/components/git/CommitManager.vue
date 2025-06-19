@@ -3,7 +3,7 @@ import { ref, computed, reactive, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Textarea from '@/components/ui/textarea/Textarea.vue';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
@@ -37,7 +37,7 @@ const {
   // hasChanges,
   hasStagedChanges,
   // isClean,
-  statusState,
+  // statusState,
   stageState,
   commitState,
   refreshStatus,
@@ -203,82 +203,62 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
     <div class="flex flex-col w-full max-w-md flex-shrink-0 space-y-4 left-panel">
       <!-- 文件变更 -->
       <Card class="gap-0">
-        <CardHeader>
-          <CardTitle class="flex items-center justify-between">
+         <CardContent class="space-y-4">
+          <!-- 暂存区部分 -->
+          <div class="flex items-center justify-between mb-2">
             <div class="flex items-center space-x-2">
-              <FileText class="w-5 h-5" />
-              <span>文件变更</span>
-              <Badge variant="secondary">{{ (repositoryStatus?.files.length || 0) }}</Badge>
+              <CheckCircle2 class="w-4 h-4" />
+              <span class="text-sm font-medium">暂存区</span>
+              <Badge variant="secondary" class="text-xs">{{ stagedFiles.length }}</Badge>
               <Button
-                v-if="statusState.loading"
-                variant="ghost"
-                size="sm"
-                disabled
-              >
-                <Loader2 class="w-4 h-4 animate-spin" />
-              </Button>
-              <Button
-                v-else
                 variant="ghost"
                 size="sm"
                 @click="handleRefresh"
               >
-                <RefreshCw class="w-4 h-4" />
-              </Button>
+              <RefreshCw class="w-4 h-4" />
+            </Button>
             </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <!-- 暂存区部分 -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center space-x-2">
-                <CheckCircle2 class="w-4 h-4" />
-                <span class="text-sm font-medium">暂存区</span>
-                <Badge variant="secondary" class="text-xs">{{ stagedFiles.length }}</Badge>
-              </div>
-              <Button
-                v-if="stagedFiles.length > 0"
-                variant="ghost"
-                size="sm"
-                @click="handleUnstageAll"
-                :disabled="stageState.loading"
-              >
-                <Loader2 v-if="stageState.loading" class="w-3 h-3 animate-spin mr-1" />
-                <span class="text-xs">全部取消暂存</span>
-              </Button>
-            </div>
+            <Button
+              v-if="stagedFiles.length > 0"
+              variant="ghost"
+              size="sm"
+              @click="handleUnstageAll"
+              :disabled="stageState.loading"
+            >
+              <Loader2 v-if="stageState.loading" class="w-3 h-3 animate-spin mr-1" />
+              <span class="text-xs">全部取消暂存</span>
+            </Button>
+          </div>
 
-            <div v-if="stagedFiles.length === 0" class="text-center py-4 text-muted-foreground">
-              <Archive class="w-8 h-8 mx-auto mb-1" />
-              <p class="text-xs">暂存区为空</p>
-            </div>
+          <div v-if="stagedFiles.length === 0" class="text-center py-4 text-muted-foreground">
+            <Archive class="w-8 h-8 mx-auto mb-1" />
+            <p class="text-xs">暂存区为空</p>
+          </div>
 
-            <div v-else class="space-y-1">
-              <div
-                v-for="file in stagedFiles"
-                :key="'staged-' + file.path"
-                class="flex items-center justify-between p-2 rounded border hover:bg-accent cursor-pointer"
-                :class="{ 'bg-accent': selectedFile === file.path }"
-                @click="selectFile(file.path)"
-              >
-                <div class="flex items-center space-x-2 flex-1 min-w-0">
-                  <FileText class="w-3 h-3 flex-shrink-0" />
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs font-medium truncate">{{ file.path }}</p>
-                    <div class="flex items-center space-x-1 mt-0.5">
-                      <Badge :variant="getStatusBadge(file.status).variant" class="text-xs px-1 py-0">
-                        {{ getStatusBadge(file.status).label }}
-                      </Badge>
-                      <span class="text-xs text-green-600">+{{ file.additions }}</span>
-                      <span class="text-xs text-red-600">-{{ file.deletions }}</span>
-                    </div>
+          <div v-else class="space-y-1">
+            <div
+              v-for="file in stagedFiles"
+              :key="'staged-' + file.path"
+              class="flex items-center justify-between p-2 rounded border hover:bg-accent cursor-pointer"
+              :class="{ 'bg-accent': selectedFile === file.path }"
+              @click="selectFile(file.path)"
+            >
+              <div class="flex items-center space-x-2 flex-1 min-w-0">
+                <FileText class="w-3 h-3 flex-shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs font-medium truncate">{{ file.path }}</p>
+                  <div class="flex items-center space-x-1 mt-0.5">
+                    <Badge :variant="getStatusBadge(file.status).variant" class="text-xs px-1 py-0">
+                      {{ getStatusBadge(file.status).label }}
+                    </Badge>
+                    <span class="text-xs text-green-600">+{{ file.additions }}</span>
+                    <span class="text-xs text-red-600">-{{ file.deletions }}</span>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)" class="h-6 w-6 p-0">
-                  <Minus class="w-3 h-3" />
-                </Button>
               </div>
+              <Button variant="ghost" size="sm" @click.stop="toggleStaged(file)" class="h-6 w-6 p-0">
+                <Minus class="w-3 h-3" />
+              </Button>
             </div>
           </div>
 
@@ -354,32 +334,31 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
       </div>
     </div>
 
-    <div class="flex-1 min-h-[400px] min-w-0 diff-viewer-container">
-        <!-- 差异内容区域 -->
-        <div class="bg-background min-h-[400px] diff-viewer-wrapper">
-          <div v-if="loadingDiff" class="flex items-center justify-center h-64 loading-state">
+    <div class="flex-1">
+        <div class="bg-background">
+          <div v-if="loadingDiff" class="flex items-center justify-center flex-1 loading-state">
             <div class="text-center">
               <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
               <p class="text-sm text-muted-foreground">加载文件差异...</p>
             </div>
           </div>
 
-          <div v-else-if="selectedFileData && selectedFileDiff" >
+          <div v-else-if="selectedFileData && selectedFileDiff" class="flex-1">
             <DiffViewer
               :file-name="selectedFileData.path"
               :diff="selectedFileDiff"
               :additions="selectedFileData.additions"
               :deletions="selectedFileData.deletions"
-              max-height="calc(100vh - 200px)"
-              class="diff-viewer w-full"
+              :max-height="'calc(100vh - 420px)'"
             />
           </div>
 
-          <div v-else class="flex items-center justify-center h-64">
+          <div v-else class="flex items-center justify-center flex-1">
             <div class="text-center text-muted-foreground">
               <FileText class="w-16 h-16 mx-auto mb-4 empty-state-icon" />
               <p class="text-lg font-medium">选择文件查看差异</p>
-              <p class="text-sm">点击左侧文件列表中的文件来查看详细变更</p>
+              <p class="text-sm">点击右侧文件列表中的文件来查看详细变更</p>
+              <p class="text-xs text-muted-foreground mt-2">💡 左侧差异查看器为代码查看提供了更宽的显示空间</p>
             </div>
           </div>
       </div>
@@ -461,9 +440,6 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
               {{ commitState.loading ? '提交中...' : '提交' }}
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground text-center">
-            按 <span class="keyboard-hint">Ctrl+Enter</span> 快速提交
-          </p>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -471,12 +447,6 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
 </template>
 
 <style scoped>
-/* 优化代码查看体验 - 上下布局提供更宽的显示空间 */
-.diff-viewer {
-  min-height: 400px;
-  width: 100%;
-}
-
 /* 文件列表项悬停效果 */
 .cursor-pointer:hover {
   transform: translateY(-1px);
@@ -488,31 +458,6 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
-}
-
-.left-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.left-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.left-panel::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 3px;
-}
-
-.left-panel::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--border) / 0.8);
-}
-
-/* 确保右侧差异查看器占据足够空间 */
-.diff-viewer-container {
-  min-width: 0;
-  /* 允许flex收缩 */
-  flex: 1;
-  /* 占据剩余空间 */
 }
 
 /* 空状态图标优化 */
@@ -572,17 +517,6 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
   height: 1rem;
 }
 
-/* 优化文件列表项在紧凑布局中的显示 */
-@media (min-width: 768px) {
-  .file-list-item {
-    padding: 0.5rem;
-  }
-
-  .file-list-item .text-xs {
-    font-size: 0.75rem;
-  }
-}
-
 /* 提交对话框样式优化 */
 .commit-dialog-content {
   max-height: 80vh;
@@ -605,14 +539,5 @@ const handleCommitKeydown = (event: KeyboardEvent) => {
 .commit-dialog-content textarea:focus {
   border-color: hsl(var(--primary));
   box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
-}
-
-/* 键盘快捷键提示样式 */
-.keyboard-hint {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-  background: hsl(var(--muted));
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
 }
 </style>

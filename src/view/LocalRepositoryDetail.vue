@@ -174,51 +174,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 快速信息卡片 -->
-        <!-- <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent class="p-4">
-              <div class="flex items-center space-x-3">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div>
-                  <p class="text-sm text-muted-foreground">当前分支</p>
-                  <p class="font-semibold">{{ repository.currentBranch || '未知' }}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent class="p-4">
-              <div class="flex items-center space-x-3">
-                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div>
-                  <p class="text-sm text-muted-foreground">仓库状态</p>
-                  <p class="font-semibold">{{ getStatusText(repository.status) }}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent class="p-4">
-              <div class="flex items-center space-x-3">
-                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div>
-                  <p class="text-sm text-muted-foreground">添加时间</p>
-                  <p class="font-semibold">{{ formatDate(repository.addedAt) }}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div> -->
-
         <!-- 功能选项卡 -->
         <Tabs v-model="activeTab" class="w-full" default-value="overview">
           <TabsList class="grid w-full grid-cols-4 mb-6">
