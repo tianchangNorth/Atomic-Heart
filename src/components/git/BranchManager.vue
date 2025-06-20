@@ -377,7 +377,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Card class="h-full">
+  <Card class="h-full gap-0 border-0 shadow-none py-0">
     <CardHeader>
       <div class="flex items-center justify-between">
         <div>
@@ -406,7 +406,7 @@ onMounted(() => {
       </div>
     </CardHeader>
     <CardContent class="p-6">
-      <div class="h-[600px] overflow-y-auto space-y-6">
+      <div class="h-auto overflow-y-auto space-y-6">
         <!-- 当前分支信息 -->
         <div v-if="currentBranch" class="space-y-3">
             <h3 class="text-sm font-medium text-muted-foreground">当前分支</h3>
@@ -449,8 +449,6 @@ onMounted(() => {
               </div>
             </div>
           </div>
-
-        <div class="border-t my-4"></div>
 
         <!-- 创建分支表单 -->
         <div v-if="showCreateForm" class="space-y-4 p-4 border rounded-lg bg-muted/30">
@@ -526,8 +524,6 @@ onMounted(() => {
             </Button>
           </div>
         </div>
-
-        <div class="border-t my-4"></div>
 
         <!-- 本地分支列表 -->
         <div class="space-y-3">
