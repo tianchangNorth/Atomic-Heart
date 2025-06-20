@@ -93,12 +93,9 @@ const fetchBranches = async () => {
     })
 
     branches.value = result
-    console.log('获取分支列表成功:', result)
-    // 初始化基础分支选择
     initializeBaseBranch()
-  } catch (error) {
-    console.error('获取分支列表失败:', error)
-    // TODO: 添加错误提示
+  } catch (e) {
+    error('获取分支失败')
   } finally {
     loading.value = false
   }
@@ -107,7 +104,7 @@ const fetchBranches = async () => {
 // 刷新分支列表
 const refreshBranches = async () => {
   await fetchBranches()
-  console.log('分支列表已刷新')
+  success('分支已刷新')
 }
 
 // 格式化时间
@@ -159,7 +156,6 @@ const createBranch = async () => {
 
   try {
     // 第一步：创建分支
-    console.log('开始创建分支:', branchName)
     const createResult = await gitApi.createBranch(
       props.repoPath,
       branchName,
@@ -168,31 +164,25 @@ const createBranch = async () => {
     )
 
     if (!createResult.success) {
-      console.error('分支创建失败:', createResult.message)
       error(`分支创建失败: ${createResult.message}`)
       return
     }
 
-    console.log('分支创建成功:', createResult.message)
     success(`分支 '${branchName}' 创建成功`)
 
     // 第二步：如果需要推送到远程
     if (pushToRemote.value) {
       pushing.value = true
       try {
-        console.log('开始推送分支到远程:', branchName)
         const pushResult = await gitApi.smartPushRemote(props.repoPath)
 
         if (pushResult.success) {
-          console.log('分支推送成功:', pushResult.message)
           success(`分支 '${branchName}' 推送成功`)
         } else {
-          console.warn('分支推送失败:', pushResult.message)
           warning(`分支推送失败: ${pushResult.message}`)
           // 推送失败不影响分支创建成功的状态
         }
       } catch (pushError) {
-        console.error('推送分支时发生错误:', pushError)
         warning(`分支推送失败: ${pushError}`)
         // 推送失败不影响分支创建成功的状态
       } finally {
@@ -205,7 +195,6 @@ const createBranch = async () => {
     resetCreateForm()
 
   } catch (createError) {
-    console.error('创建分支时发生错误:', createError)
     error(`创建分支失败: ${createError}`)
   } finally {
     creating.value = false
@@ -221,17 +210,16 @@ const switchToBranch = async (branchName: string) => {
     const result = await gitApi.switchBranch(props.repoPath, branchName)
 
     if (result.success) {
-      console.log('分支切换成功:', result.message)
-      // 重新获取分支列表
+      success('分支切换成功')
       await fetchBranches()
     } else {
-      console.error('分支切换失败:', result.message)
+      error('分支切换失败')
       if (result.has_uncommitted_changes) {
         console.log('未提交的文件:', result.uncommitted_files)
       }
     }
-  } catch (error) {
-    console.error('切换分支时发生错误:', error)
+  } catch (e) {
+    error(`分支切换发生错误${e}`)
   } finally {
     loading.value = false
   }
@@ -246,16 +234,13 @@ const deleteBranch = async (branchName: string, force = false) => {
     const result = await gitApi.deleteBranch(props.repoPath, branchName, force)
 
     if (result.success) {
-      console.log('分支删除成功:', result.message)
       success(`分支 '${branchName}' 删除成功`)
       // 重新获取分支列表
       await fetchBranches()
     } else {
-      console.error('分支删除失败:', result.message)
       error(`分支删除失败: ${result.message}`)
     }
   } catch (deleteError) {
-    console.error('删除分支时发生错误:', deleteError)
     error(`删除分支失败: ${deleteError}`)
   } finally {
     loading.value = false
@@ -268,12 +253,9 @@ const pushBranchToRemote = async (branchName: string) => {
 
   loading.value = true
   try {
-    console.log('开始推送分支到远程:', branchName)
-
     // 如果不是当前分支，需要先切换
     const needSwitch = currentBranch.value?.name !== branchName
     if (needSwitch) {
-      console.log('切换到目标分支:', branchName)
       const switchResult = await gitApi.switchBranch(props.repoPath, branchName)
       if (!switchResult.success) {
         if (switchResult.has_uncommitted_changes) {
@@ -290,16 +272,13 @@ const pushBranchToRemote = async (branchName: string) => {
     const pushResult = await gitApi.smartPushRemote(props.repoPath)
 
     if (pushResult.success) {
-      console.log('分支推送成功:', pushResult.message)
       success(`分支 '${branchName}' 推送成功`)
       // 重新获取分支列表以更新状态
       await fetchBranches()
     } else {
-      console.error('分支推送失败:', pushResult.message)
       error(`分支推送失败: ${pushResult.message}`)
     }
   } catch (pushError) {
-    console.error('推送分支时发生错误:', pushError)
     error(`推送分支失败: ${pushError}`)
   } finally {
     loading.value = false
@@ -349,21 +328,16 @@ const checkoutRemoteBranch = async (remoteBranchName: string) => {
 
   loading.value = true
   try {
-    console.log('开始检出远程分支:', remoteBranchName)
-
     const result = await gitApi.checkoutRemoteBranch(props.repoPath, remoteBranchName)
 
     if (result.success) {
-      console.log('远程分支检出成功:', result.message)
       success(result.message)
       // 重新获取分支列表以更新状态
       await fetchBranches()
     } else {
-      console.error('远程分支检出失败:', result.message)
       error(`检出失败: ${result.message}`)
     }
   } catch (checkoutError) {
-    console.error('检出远程分支时发生错误:', checkoutError)
     error(`检出失败: ${checkoutError}`)
   } finally {
     loading.value = false
