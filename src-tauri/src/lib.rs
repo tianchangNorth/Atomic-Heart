@@ -132,7 +132,13 @@ pub fn run() {
             commands::git::pull_remote_with_system_git,
             // 远程名称检测
             commands::git::detect_repository_remotes,
-            commands::git::get_default_remote_name_command
+            commands::git::get_default_remote_name_command,
+            // 分支管理
+            commands::git::list_branches,
+            commands::git::create_branch,
+            commands::git::switch_branch,
+            commands::git::delete_branch,
+            commands::git::checkout_remote_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

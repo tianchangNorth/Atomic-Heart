@@ -255,7 +255,7 @@ onMounted(() => {
           </TabsContent>
 
           <TabsContent value="branches">
-            <BranchManager />
+            <BranchManager :repo-path="repository?.path || ''" />
           </TabsContent>
         </Tabs>
       </div>

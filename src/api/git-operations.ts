@@ -38,6 +38,13 @@ export interface SyncResult {
   behind: number;
 }
 
+export interface SwitchResult {
+  success: boolean;
+  message: string;
+  has_uncommitted_changes: boolean;
+  uncommitted_files: string[];
+}
+
 export type PullStrategy = 'merge' | 'rebase';
 
 export interface RemoteBranchInfo {
@@ -409,6 +416,89 @@ export class GitOperationsApi {
     } catch (error) {
       console.error('获取默认远程名称失败:', error);
       throw new Error(`获取默认远程名称失败: ${error}`);
+    }
+  }
+
+  // ==================== 分支操作 ====================
+
+  /**
+   * 创建新分支
+   */
+  async createBranch(
+    repoPath: string,
+    branchName: string,
+    fromCommit?: string,
+    checkout?: boolean
+  ): Promise<SwitchResult> {
+    try {
+      const result = await invoke<SwitchResult>('create_branch', {
+        repoPath,
+        branchName,
+        fromCommit,
+        checkout
+      });
+      return result;
+    } catch (error) {
+      console.error('创建分支失败:', error);
+      throw new Error(`创建分支失败: ${error}`);
+    }
+  }
+
+  /**
+   * 切换分支
+   */
+  async switchBranch(repoPath: string, branchName: string): Promise<SwitchResult> {
+    try {
+      const result = await invoke<SwitchResult>('switch_branch', {
+        repoPath,
+        branchName
+      });
+      return result;
+    } catch (error) {
+      console.error('切换分支失败:', error);
+      throw new Error(`切换分支失败: ${error}`);
+    }
+  }
+
+  /**
+   * 删除分支
+   */
+  async deleteBranch(
+    repoPath: string,
+    branchName: string,
+    force?: boolean
+  ): Promise<SwitchResult> {
+    try {
+      const result = await invoke<SwitchResult>('delete_branch', {
+        repoPath,
+        branchName,
+        force
+      });
+      return result;
+    } catch (error) {
+      console.error('删除分支失败:', error);
+      throw new Error(`删除分支失败: ${error}`);
+    }
+  }
+
+  /**
+   * 检出远程分支
+   */
+  async checkoutRemoteBranch(
+    repoPath: string,
+    remoteBranchName: string,
+    localBranchName?: string
+  ): Promise<SwitchResult> {
+    try {
+      const result = await invoke<SwitchResult>('checkout_remote_branch', {
+        repoPath,
+        remoteBranchName,
+        localBranchName
+      });
+      return result;
+    } catch (error) {
+      console.error('检出远程分支失败:', error);
+      throw new Error(`检出远程分支失败: ${error}`);
     }
   }
 

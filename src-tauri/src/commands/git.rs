@@ -1327,6 +1327,134 @@ async fn get_conflict_files_with_git(repo_path: &str) -> Result<Vec<String>, Str
     }
 }
 
+// ==================== 分支管理命令 ====================
+
+/// 获取分支列表
+#[command]
+pub async fn list_branches(
+    repo_path: String,
+) -> Result<Vec<crate::git::operations::BranchInfo>, String> {
+    log::debug!("获取分支列表: {}", repo_path);
+
+    match crate::git::operations::list_branches(&repo_path) {
+        Ok(branches) => {
+            log::debug!("成功获取 {} 个分支", branches.len());
+            Ok(branches)
+        }
+        Err(e) => {
+            log::error!("获取分支列表失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 创建新分支
+#[command]
+pub async fn create_branch(
+    repo_path: String,
+    branch_name: String,
+    from_commit: Option<String>,
+    checkout: Option<bool>,
+) -> Result<crate::git::operations::SwitchResult, String> {
+    log::debug!(
+        "创建分支: {} (from: {:?}, checkout: {:?})",
+        repo_path,
+        from_commit,
+        checkout
+    );
+
+    match crate::git::operations::create_branch(
+        &repo_path,
+        &branch_name,
+        from_commit.as_deref(),
+        checkout.unwrap_or(false),
+    ) {
+        Ok(result) => {
+            log::debug!("分支创建成功: {}", branch_name);
+            Ok(result)
+        }
+        Err(e) => {
+            log::error!("创建分支失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 切换分支
+#[command]
+pub async fn switch_branch(
+    repo_path: String,
+    branch_name: String,
+) -> Result<crate::git::operations::SwitchResult, String> {
+    log::debug!("切换分支: {} -> {}", repo_path, branch_name);
+
+    match crate::git::operations::switch_branch(&repo_path, &branch_name) {
+        Ok(result) => {
+            log::debug!("分支切换结果: {:?}", result);
+            Ok(result)
+        }
+        Err(e) => {
+            log::error!("切换分支失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 删除分支
+#[command]
+pub async fn delete_branch(
+    repo_path: String,
+    branch_name: String,
+    force: Option<bool>,
+) -> Result<crate::git::operations::SwitchResult, String> {
+    log::debug!(
+        "删除分支: {} (branch: {}, force: {:?})",
+        repo_path,
+        branch_name,
+        force
+    );
+
+    match crate::git::operations::delete_branch(&repo_path, &branch_name, force.unwrap_or(false)) {
+        Ok(result) => {
+            log::debug!("分支删除成功: {}", branch_name);
+            Ok(result)
+        }
+        Err(e) => {
+            log::error!("删除分支失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// 检出远程分支
+#[command]
+pub async fn checkout_remote_branch(
+    repo_path: String,
+    remote_branch_name: String,
+    local_branch_name: Option<String>,
+) -> Result<crate::git::operations::SwitchResult, String> {
+    log::debug!(
+        "检出远程分支: {} -> {:?}",
+        remote_branch_name,
+        local_branch_name
+    );
+
+    match crate::git::operations::checkout_remote_branch(
+        &repo_path,
+        &remote_branch_name,
+        local_branch_name.as_deref(),
+    ) {
+        Ok(result) => {
+            log::debug!("远程分支检出成功: {}", remote_branch_name);
+            Ok(result)
+        }
+        Err(e) => {
+            log::error!("检出远程分支失败: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
 /// 检测并验证仓库的远程配置
 #[command]
 pub async fn detect_repository_remotes(repo_path: String) -> Result<Vec<String>, String> {

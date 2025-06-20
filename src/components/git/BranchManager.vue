@@ -1,457 +1,664 @@
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import type { BranchInfo } from '@/types/git';
+import { ref, onMounted, computed } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast'
+import {
+  GitBranch,
+  Plus,
+  Trash2,
+  RefreshCw,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  GitCommit,
+  Upload,
+} from 'lucide-vue-next'
+import { GitOperationsApi } from '@/api/git-operations'
 
-// 模拟分支数据
-const branches = ref<BranchInfo[]>([
-  {
-    name: 'main',
-    type: 'local',
-    current: true,
-    upstream: 'origin/main',
-    lastCommit: {
-      sha: 'abc123def456',
-      message: 'feat: 添加分支管理界面',
-      author: { name: 'Developer', email: 'dev@example.com', date: '2024-12-15T14:20:00Z' },
-      committer: { name: 'Developer', email: 'dev@example.com', date: '2024-12-15T14:20:00Z' },
-      url: ''
-    },
-    ahead: 2,
-    behind: 0
-  },
-  {
-    name: 'develop',
-    type: 'local',
-    current: false,
-    upstream: 'origin/develop',
-    lastCommit: {
-      sha: 'def456ghi789',
-      message: 'fix: 修复文件树展开问题',
-      author: { name: 'Developer', email: 'dev@example.com', date: '2024-12-14T16:45:00Z' },
-      committer: { name: 'Developer', email: 'dev@example.com', date: '2024-12-14T16:45:00Z' },
-      url: ''
-    },
-    ahead: 0,
-    behind: 1
-  },
-  {
-    name: 'feature/new-ui',
-    type: 'local',
-    current: false,
-    lastCommit: {
-      sha: 'ghi789jkl012',
-      message: 'wip: 新UI设计进行中',
-      author: { name: 'Designer', email: 'design@example.com', date: '2024-12-13T09:15:00Z' },
-      committer: { name: 'Designer', email: 'design@example.com', date: '2024-12-13T09:15:00Z' },
-      url: ''
-    },
-    ahead: 5,
-    behind: 3
-  },
-  {
-    name: 'origin/main',
-    type: 'remote',
-    current: false,
-    lastCommit: {
-      sha: 'jkl012mno345',
-      message: 'docs: 更新README文档',
-      author: { name: 'Maintainer', email: 'maintainer@example.com', date: '2024-12-15T12:00:00Z' },
-      committer: { name: 'Maintainer', email: 'maintainer@example.com', date: '2024-12-15T12:00:00Z' },
-      url: ''
-    },
-    ahead: 0,
-    behind: 0
-  },
-  {
-    name: 'origin/develop',
-    type: 'remote',
-    current: false,
-    lastCommit: {
-      sha: 'mno345pqr678',
-      message: 'test: 添加单元测试',
-      author: { name: 'Tester', email: 'test@example.com', date: '2024-12-14T18:30:00Z' },
-      committer: { name: 'Tester', email: 'test@example.com', date: '2024-12-14T18:30:00Z' },
-      url: ''
-    },
-    ahead: 0,
-    behind: 0
+// 分支信息接口
+interface BranchInfo {
+  name: string
+  is_current: boolean
+  is_remote: boolean
+  upstream?: string
+  ahead: number
+  behind: number
+  last_commit?: {
+    sha: string
+    message: string
+    author_name: string
+    author_email: string
+    timestamp: number
   }
-]);
+}
 
-const newBranchForm = reactive({
-  name: '',
-  baseBranch: 'main',
-  checkout: true
-});
+// Props
+interface Props {
+  repoPath: string
+}
 
-const searchQuery = ref('');
-const selectedBranch = ref<string | null>(null);
-const isCreating = ref(false);
-const showCreateForm = ref(false);
+const props = defineProps<Props>()
+
+// Toast通知
+const { success, error, warning } = useToast()
+
+// 响应式数据
+const branches = ref<BranchInfo[]>([])
+const loading = ref(false)
+const gitApi = new GitOperationsApi()
+
+// 创建分支相关状态
+const showCreateForm = ref(false)
+const newBranchName = ref('')
+const selectedBaseBranch = ref('')
+const checkoutAfterCreate = ref(true)
+const pushToRemote = ref(false)
+const creating = ref(false)
+const pushing = ref(false)
 
 // 计算属性
 const localBranches = computed(() =>
-  branches.value.filter(b => b.type === 'local')
-);
+  branches.value.filter(branch => !branch.is_remote)
+)
 
 const remoteBranches = computed(() =>
-  branches.value.filter(b => b.type === 'remote')
-);
-
-const filteredLocalBranches = computed(() => {
-  if (!searchQuery.value) return localBranches.value;
-  return localBranches.value.filter(b =>
-    b.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
-});
-
-const filteredRemoteBranches = computed(() => {
-  if (!searchQuery.value) return remoteBranches.value;
-  return remoteBranches.value.filter(b =>
-    b.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
-});
+  branches.value.filter(branch => branch.is_remote)
+)
 
 const currentBranch = computed(() =>
-  branches.value.find(b => b.current)
-);
+  branches.value.find(branch => branch.is_current)
+)
 
-const canCreateBranch = computed(() =>
-  newBranchForm.name.trim() && !isCreating.value
-);
+// 可选择的基础分支列表（本地分支）
+const availableBaseBranches = computed(() =>
+  localBranches.value.map(branch => ({
+    value: branch.name,
+    label: branch.name,
+    isCurrent: branch.is_current
+  }))
+)
 
-// 方法
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
+// 获取分支列表
+const fetchBranches = async () => {
+  if (!props.repoPath) return
 
-  if (diffMins < 1) return '刚刚';
-  if (diffMins < 60) return `${diffMins} 分钟前`;
-  if (diffMins < 1440) return `${Math.floor(diffMins / 60)} 小时前`;
-  return `${Math.floor(diffMins / 1440)} 天前`;
-};
+  loading.value = true
+  try {
+    const result = await invoke<BranchInfo[]>('list_branches', {
+      repoPath: props.repoPath
+    })
 
-const getBranchStatusColor = (branch: BranchInfo): string => {
-  if (branch.current) return 'text-green-600';
-  if (branch.ahead > 0 && branch.behind > 0) return 'text-yellow-600';
-  if (branch.ahead > 0) return 'text-blue-600';
-  if (branch.behind > 0) return 'text-orange-600';
-  return 'text-muted-foreground';
-};
+    branches.value = result
+    console.log('获取分支列表成功:', result)
+    // 初始化基础分支选择
+    initializeBaseBranch()
+  } catch (error) {
+    console.error('获取分支列表失败:', error)
+    // TODO: 添加错误提示
+  } finally {
+    loading.value = false
+  }
+}
 
-const getBranchStatusText = (branch: BranchInfo): string => {
-  if (branch.current) return '当前分支';
-  if (branch.ahead > 0 && branch.behind > 0) return `领先 ${branch.ahead}，落后 ${branch.behind}`;
-  if (branch.ahead > 0) return `领先 ${branch.ahead} 个提交`;
-  if (branch.behind > 0) return `落后 ${branch.behind} 个提交`;
-  return '已同步';
-};
+// 刷新分支列表
+const refreshBranches = async () => {
+  await fetchBranches()
+  console.log('分支列表已刷新')
+}
 
-const switchBranch = async (branchName: string) => {
-  if (branchName === currentBranch.value?.name) return;
+// 格式化时间
+const formatTime = (timestamp: number) => {
+  const date = new Date(timestamp * 1000)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
 
-  // 模拟切换分支
-  const targetBranch = branches.value.find(b => b.name === branchName && b.type === 'local');
-  if (!targetBranch) return;
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins} 分钟前`
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)} 小时前`
+  return `${Math.floor(diffMins / 1440)} 天前`
+}
 
-  // 更新当前分支状态
-  branches.value.forEach(b => {
-    b.current = b.name === branchName && b.type === 'local';
-  });
+// 格式化提交消息
+const formatCommitMessage = (message: string) => {
+  const firstLine = message.split('\n')[0]
+  return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine
+}
 
-  selectedBranch.value = null;
-};
+// 获取分支状态徽章
+const getBranchStatusBadge = (branch: BranchInfo) => {
+  if (branch.is_current) {
+    return { text: '当前', variant: 'default' as const }
+  }
+  if (branch.ahead > 0 && branch.behind > 0) {
+    return { text: '分歧', variant: 'destructive' as const }
+  }
+  if (branch.ahead > 0) {
+    return { text: '领先', variant: 'secondary' as const }
+  }
+  if (branch.behind > 0) {
+    return { text: '落后', variant: 'outline' as const }
+  }
+  // 检查是否需要推送（本地分支但没有远程跟踪）
+  if (needsPush(branch)) {
+    return { text: '未推送', variant: 'outline' as const }
+  }
+  return null
+}
 
+// 创建分支
 const createBranch = async () => {
-  if (!canCreateBranch.value) return;
+  if (!newBranchName.value.trim() || creating.value) return
 
-  isCreating.value = true;
+  creating.value = true
+  const branchName = newBranchName.value.trim()
 
-  // 模拟创建分支
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  try {
+    // 第一步：创建分支
+    console.log('开始创建分支:', branchName)
+    const createResult = await gitApi.createBranch(
+      props.repoPath,
+      branchName,
+      selectedBaseBranch.value || undefined,
+      checkoutAfterCreate.value
+    )
 
-  const baseBranch = branches.value.find(b => b.name === newBranchForm.baseBranch && b.type === 'local');
-  const newBranch: BranchInfo = {
-    name: newBranchForm.name,
-    type: 'local',
-    current: newBranchForm.checkout,
-    lastCommit: baseBranch?.lastCommit || {
-      sha: 'new123branch456',
-      message: '创建新分支',
-      author: { name: 'Developer', email: 'dev@example.com', date: new Date().toISOString() },
-      committer: { name: 'Developer', email: 'dev@example.com', date: new Date().toISOString() },
-      url: ''
-    },
-    ahead: 0,
-    behind: 0
-  };
+    if (!createResult.success) {
+      console.error('分支创建失败:', createResult.message)
+      error(`分支创建失败: ${createResult.message}`)
+      return
+    }
 
-  branches.value.push(newBranch);
+    console.log('分支创建成功:', createResult.message)
+    success(`分支 '${branchName}' 创建成功`)
 
-  if (newBranchForm.checkout) {
-    branches.value.forEach(b => {
-      b.current = b.name === newBranch.name && b.type === 'local';
-    });
+    // 第二步：如果需要推送到远程
+    if (pushToRemote.value) {
+      pushing.value = true
+      try {
+        console.log('开始推送分支到远程:', branchName)
+        const pushResult = await gitApi.smartPushRemote(props.repoPath)
+
+        if (pushResult.success) {
+          console.log('分支推送成功:', pushResult.message)
+          success(`分支 '${branchName}' 推送成功`)
+        } else {
+          console.warn('分支推送失败:', pushResult.message)
+          warning(`分支推送失败: ${pushResult.message}`)
+          // 推送失败不影响分支创建成功的状态
+        }
+      } catch (pushError) {
+        console.error('推送分支时发生错误:', pushError)
+        warning(`分支推送失败: ${pushError}`)
+        // 推送失败不影响分支创建成功的状态
+      } finally {
+        pushing.value = false
+      }
+    }
+
+    // 第三步：重新获取分支列表和重置表单
+    await fetchBranches()
+    resetCreateForm()
+
+  } catch (createError) {
+    console.error('创建分支时发生错误:', createError)
+    error(`创建分支失败: ${createError}`)
+  } finally {
+    creating.value = false
   }
+}
 
-  // 重置表单
-  newBranchForm.name = '';
-  newBranchForm.baseBranch = 'main';
-  newBranchForm.checkout = true;
-  showCreateForm.value = false;
-  isCreating.value = false;
-};
+// 切换分支
+const switchToBranch = async (branchName: string) => {
+  if (loading.value) return
 
-const deleteBranch = async (branchName: string) => {
-  if (branchName === currentBranch.value?.name) return;
+  loading.value = true
+  try {
+    const result = await gitApi.switchBranch(props.repoPath, branchName)
 
-  const index = branches.value.findIndex(b => b.name === branchName && b.type === 'local');
-  if (index > -1) {
-    branches.value.splice(index, 1);
+    if (result.success) {
+      console.log('分支切换成功:', result.message)
+      // 重新获取分支列表
+      await fetchBranches()
+    } else {
+      console.error('分支切换失败:', result.message)
+      if (result.has_uncommitted_changes) {
+        console.log('未提交的文件:', result.uncommitted_files)
+      }
+    }
+  } catch (error) {
+    console.error('切换分支时发生错误:', error)
+  } finally {
+    loading.value = false
   }
+}
 
-  selectedBranch.value = null;
-};
+// 删除分支
+const deleteBranch = async (branchName: string, force = false) => {
+  if (loading.value) return
 
-const mergeBranch = async (branchName: string) => {
-  // 模拟合并分支
-  console.log(`合并分支: ${branchName} -> ${currentBranch.value?.name}`);
-  selectedBranch.value = null;
-};
+  loading.value = true
+  try {
+    const result = await gitApi.deleteBranch(props.repoPath, branchName, force)
 
-const selectBranch = (branchName: string) => {
-  selectedBranch.value = selectedBranch.value === branchName ? null : branchName;
-};
+    if (result.success) {
+      console.log('分支删除成功:', result.message)
+      success(`分支 '${branchName}' 删除成功`)
+      // 重新获取分支列表
+      await fetchBranches()
+    } else {
+      console.error('分支删除失败:', result.message)
+      error(`分支删除失败: ${result.message}`)
+    }
+  } catch (deleteError) {
+    console.error('删除分支时发生错误:', deleteError)
+    error(`删除分支失败: ${deleteError}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 推送单个分支到远程
+const pushBranchToRemote = async (branchName: string) => {
+  if (loading.value) return
+
+  loading.value = true
+  try {
+    console.log('开始推送分支到远程:', branchName)
+
+    // 如果不是当前分支，需要先切换
+    const needSwitch = currentBranch.value?.name !== branchName
+    if (needSwitch) {
+      console.log('切换到目标分支:', branchName)
+      const switchResult = await gitApi.switchBranch(props.repoPath, branchName)
+      if (!switchResult.success) {
+        if (switchResult.has_uncommitted_changes) {
+          warning(`无法切换分支: 存在未提交的变更`)
+          return
+        } else {
+          error(`切换分支失败: ${switchResult.message}`)
+          return
+        }
+      }
+    }
+
+    // 推送分支
+    const pushResult = await gitApi.smartPushRemote(props.repoPath)
+
+    if (pushResult.success) {
+      console.log('分支推送成功:', pushResult.message)
+      success(`分支 '${branchName}' 推送成功`)
+      // 重新获取分支列表以更新状态
+      await fetchBranches()
+    } else {
+      console.error('分支推送失败:', pushResult.message)
+      error(`分支推送失败: ${pushResult.message}`)
+    }
+  } catch (pushError) {
+    console.error('推送分支时发生错误:', pushError)
+    error(`推送分支失败: ${pushError}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 重置创建表单
+const resetCreateForm = () => {
+  newBranchName.value = ''
+  selectedBaseBranch.value = currentBranch.value?.name || ''
+  checkoutAfterCreate.value = true
+  pushToRemote.value = false
+  showCreateForm.value = false
+}
+
+// 初始化基础分支选择
+const initializeBaseBranch = () => {
+  if (!selectedBaseBranch.value && currentBranch.value) {
+    selectedBaseBranch.value = currentBranch.value.name
+  }
+}
+
+// 获取创建按钮文本
+const getCreateButtonText = () => {
+  if (creating.value && !pushing.value) {
+    return '创建中...'
+  }
+  if (pushing.value) {
+    return '推送中...'
+  }
+  return '创建分支'
+}
+
+// 检查分支是否需要推送（没有远程跟踪分支）
+const needsPush = (branch: BranchInfo) => {
+  // 如果是本地分支且没有对应的远程分支，则需要推送
+  if (!branch.is_remote) {
+    const remoteBranchName = `origin/${branch.name}`
+    return !remoteBranches.value.some(remote => remote.name === remoteBranchName)
+  }
+  return false
+}
+
+// 检出远程分支
+const checkoutRemoteBranch = async (remoteBranchName: string) => {
+  if (loading.value) return
+
+  loading.value = true
+  try {
+    console.log('开始检出远程分支:', remoteBranchName)
+
+    const result = await gitApi.checkoutRemoteBranch(props.repoPath, remoteBranchName)
+
+    if (result.success) {
+      console.log('远程分支检出成功:', result.message)
+      success(result.message)
+      // 重新获取分支列表以更新状态
+      await fetchBranches()
+    } else {
+      console.error('远程分支检出失败:', result.message)
+      error(`检出失败: ${result.message}`)
+    }
+  } catch (checkoutError) {
+    console.error('检出远程分支时发生错误:', checkoutError)
+    error(`检出失败: ${checkoutError}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 组件挂载时获取分支列表
+onMounted(() => {
+  fetchBranches()
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- 顶部操作栏 -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <span>分支管理</span>
-            <Badge v-if="currentBranch" variant="default" class="ml-2">
-              {{ currentBranch.name }}
-            </Badge>
-          </div>
-          <Button @click="showCreateForm = !showCreateForm">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
+  <Card class="h-full">
+    <CardHeader>
+      <div class="flex items-center justify-between">
+        <div>
+          <CardTitle class="flex items-center gap-2">
+            <GitBranch class="h-5 w-5" />
+            分支管理
+          </CardTitle>
+          <CardDescription>
+            管理Git分支，查看分支状态和历史
+          </CardDescription>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="refreshBranches"
+            :disabled="loading"
+          >
+            <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
+          </Button>
+          <Button size="sm" @click="showCreateForm = !showCreateForm">
+            <Plus class="h-4 w-4 mr-2" />
             新建分支
           </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <!-- 搜索框 -->
-        <div class="flex space-x-4">
-          <div class="flex-1">
-            <Input
-              v-model="searchQuery"
-              placeholder="搜索分支..."
-              class="w-full"
-            >
-              <template #prefix>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-              </template>
-            </Input>
-          </div>
         </div>
+      </div>
+    </CardHeader>
+    <CardContent class="p-6">
+      <div class="h-[600px] overflow-y-auto space-y-6">
+        <!-- 当前分支信息 -->
+        <div v-if="currentBranch" class="space-y-3">
+            <h3 class="text-sm font-medium text-muted-foreground">当前分支</h3>
+            <div class="p-4 border rounded-lg bg-muted/50">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <GitBranch class="h-4 w-4 text-primary" />
+                  <span class="font-medium">{{ currentBranch.name }}</span>
+                  <Badge variant="default">当前</Badge>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div v-if="currentBranch.ahead > 0" class="flex items-center gap-1">
+                    <ArrowUp class="h-3 w-3" />
+                    {{ currentBranch.ahead }}
+                  </div>
+                  <div v-if="currentBranch.behind > 0" class="flex items-center gap-1">
+                    <ArrowDown class="h-3 w-3" />
+                    {{ currentBranch.behind }}
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="currentBranch.last_commit" class="mt-3 pt-3 border-t">
+                <div class="flex items-start gap-3">
+                  <GitCommit class="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium">
+                      {{ formatCommitMessage(currentBranch.last_commit.message) }}
+                    </p>
+                    <div class="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                      <span>{{ currentBranch.last_commit.author_name }}</span>
+                      <span class="flex items-center gap-1">
+                        <Clock class="h-3 w-3" />
+                        {{ formatTime(currentBranch.last_commit.timestamp) }}
+                      </span>
+                      <span class="font-mono">{{ currentBranch.last_commit.sha.substring(0, 7) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        <div class="border-t my-4"></div>
 
         <!-- 创建分支表单 -->
-        <div v-if="showCreateForm" class="mt-4 p-4 border rounded-lg bg-muted/50">
-          <h3 class="font-medium mb-3">创建新分支</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-2">
-              <label class="text-sm font-medium">分支名称</label>
+        <div v-if="showCreateForm" class="space-y-4 p-4 border rounded-lg bg-muted/30">
+          <h3 class="text-sm font-medium">创建新分支</h3>
+
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs font-medium text-muted-foreground">分支名称</label>
               <Input
-                v-model="newBranchForm.name"
+                v-model="newBranchName"
                 placeholder="feature/new-feature"
+                class="mt-1"
+                @keyup.enter="createBranch"
               />
             </div>
-            <div class="space-y-2">
-              <label class="text-sm font-medium">基于分支</label>
-              <select 
-                v-model="newBranchForm.baseBranch"
-                class="w-full px-3 py-2 border border-border rounded-md bg-background"
+
+            <div>
+              <label class="text-xs font-medium text-muted-foreground">基于分支</label>
+              <select
+                v-model="selectedBaseBranch"
+                class="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               >
-                <option v-for="branch in localBranches" :key="branch.name" :value="branch.name">
-                  {{ branch.name }}
+                <option
+                  v-for="branch in availableBaseBranches"
+                  :key="branch.value"
+                  :value="branch.value"
+                >
+                  {{ branch.label }}{{ branch.isCurrent ? ' (当前)' : '' }}
                 </option>
               </select>
             </div>
-          </div>
-          <div class="flex items-center justify-between mt-4">
-            <label class="flex items-center space-x-2">
-              <input v-model="newBranchForm.checkout" type="checkbox" class="rounded border-border">
-              <span class="text-sm">创建后切换到新分支</span>
-            </label>
-            <div class="space-x-2">
-              <Button variant="outline" @click="showCreateForm = false">
-                取消
-              </Button>
-              <Button @click="createBranch" :disabled="!canCreateBranch">
-                <svg v-if="isCreating" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                {{ isCreating ? '创建中...' : '创建分支' }}
-              </Button>
+
+            <div class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <input
+                  id="checkout-after-create"
+                  v-model="checkoutAfterCreate"
+                  type="checkbox"
+                  class="rounded border-border"
+                />
+                <label for="checkout-after-create" class="text-xs">创建后切换到新分支</label>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <input
+                  id="push-to-remote"
+                  v-model="pushToRemote"
+                  type="checkbox"
+                  class="rounded border-border"
+                />
+                <label for="push-to-remote" class="text-xs">创建后推送到远程</label>
+              </div>
             </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button
+              size="sm"
+              @click="createBranch"
+              :disabled="!newBranchName.trim() || creating || pushing"
+            >
+              <Plus v-if="!creating && !pushing" class="h-3 w-3 mr-1" />
+              <RefreshCw v-else class="h-3 w-3 mr-1 animate-spin" />
+              {{ getCreateButtonText() }}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              @click="resetCreateForm"
+              :disabled="creating || pushing"
+            >
+              取消
+            </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- 本地分支 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            <span>本地分支</span>
-            <Badge variant="secondary">{{ filteredLocalBranches.length }}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-2">
-            <div
-              v-for="branch in filteredLocalBranches"
-              :key="branch.name"
-              class="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-              :class="{ 'bg-accent': selectedBranch === branch.name, 'border-primary': branch.current }"
-              @click="selectBranch(branch.name)"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3 flex-1 min-w-0">
-                  <div class="flex items-center space-x-2">
-                    <svg 
-                      class="w-4 h-4" 
-                      :class="getBranchStatusColor(branch)"
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
+        <div class="border-t my-4"></div>
+
+        <!-- 本地分支列表 -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-medium text-muted-foreground">
+                本地分支 ({{ localBranches.length }})
+              </h3>
+            </div>
+
+            <div class="space-y-2">
+              <div
+                v-for="branch in localBranches"
+                :key="branch.name"
+                class="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                :class="{ 'bg-muted/30': branch.is_current }"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <GitBranch class="h-4 w-4 text-muted-foreground" />
+                    <span class="font-medium truncate">{{ branch.name }}</span>
+
+                    <div class="flex items-center gap-2">
+                      <Badge
+                        v-if="getBranchStatusBadge(branch)"
+                        :variant="getBranchStatusBadge(branch)!.variant"
+                        class="text-xs"
+                      >
+                        {{ getBranchStatusBadge(branch)!.text }}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-3 text-sm text-muted-foreground">
+                      <div v-if="branch.ahead > 0" class="flex items-center gap-1">
+                        <ArrowUp class="h-3 w-3" />
+                        {{ branch.ahead }}
+                      </div>
+                      <div v-if="branch.behind > 0" class="flex items-center gap-1">
+                        <ArrowDown class="h-3 w-3" />
+                        {{ branch.behind }}
+                      </div>
+                    </div>
+
+                    <!-- 推送按钮：仅对需要推送的分支显示 -->
+                    <Button
+                      v-if="needsPush(branch)"
+                      variant="ghost"
+                      size="sm"
+                      @click="pushBranchToRemote(branch.name)"
+                      :disabled="loading"
+                      title="推送到远程"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span class="font-medium">{{ branch.name }}</span>
-                    <Badge v-if="branch.current" variant="default" class="text-xs">
-                      当前
-                    </Badge>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <div class="text-xs text-muted-foreground">
-                    {{ formatDate(branch.lastCommit.date!) }}
-                  </div>
-                  <div class="text-xs" :class="getBranchStatusColor(branch)">
-                    {{ getBranchStatusText(branch) }}
-                  </div>
-                </div>
-              </div>
-              
-              <div class="mt-2 text-sm text-muted-foreground truncate">
-                {{ branch.lastCommit.message }}
-              </div>
-              
-              <!-- 分支操作按钮 -->
-              <div v-if="selectedBranch === branch.name" class="mt-3 flex space-x-2">
-                <Button 
-                  v-if="!branch.current"
-                  size="sm" 
-                  @click.stop="switchBranch(branch.name)"
-                >
-                  切换
-                </Button>
-                <Button 
-                  v-if="!branch.current && currentBranch"
-                  variant="outline" 
-                  size="sm" 
-                  @click.stop="mergeBranch(branch.name)"
-                >
-                  合并到 {{ currentBranch.name }}
-                </Button>
-                <Button 
-                  v-if="!branch.current"
-                  variant="destructive" 
-                  size="sm" 
-                  @click.stop="deleteBranch(branch.name)"
-                >
-                  删除
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                      <Upload class="h-4 w-4" />
+                    </Button>
 
-      <!-- 远程分支 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
-            </svg>
-            <span>远程分支</span>
-            <Badge variant="outline">{{ filteredRemoteBranches.length }}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-2">
-            <div
-              v-for="branch in filteredRemoteBranches"
-              :key="branch.name"
-              class="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-              :class="{ 'bg-accent': selectedBranch === branch.name }"
-              @click="selectBranch(branch.name)"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3 flex-1 min-w-0">
-                  <div class="flex items-center space-x-2">
-                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
-                    </svg>
-                    <span class="font-medium">{{ branch.name }}</span>
+                    <Button
+                      v-if="!branch.is_current"
+                      variant="ghost"
+                      size="sm"
+                      @click="switchToBranch(branch.name)"
+                      :disabled="loading"
+                    >
+                      切换
+                    </Button>
+
+                    <Button
+                      v-if="!branch.is_current"
+                      variant="ghost"
+                      size="sm"
+                      @click="deleteBranch(branch.name)"
+                      :disabled="loading"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div class="text-right">
-                  <div class="text-xs text-muted-foreground">
-                    {{ formatDate(branch.lastCommit.date!) }}
+
+                <div v-if="branch.last_commit" class="mt-2 ml-7 text-sm text-muted-foreground">
+                  <p class="truncate">{{ formatCommitMessage(branch.last_commit.message) }}</p>
+                  <div class="flex items-center gap-3 mt-1 text-xs">
+                    <span>{{ branch.last_commit.author_name }}</span>
+                    <span>{{ formatTime(branch.last_commit.timestamp) }}</span>
                   </div>
                 </div>
-              </div>
-              
-              <div class="mt-2 text-sm text-muted-foreground truncate">
-                {{ branch.lastCommit.message }}
-              </div>
-              
-              <!-- 远程分支操作按钮 -->
-              <div v-if="selectedBranch === branch.name" class="mt-3 flex space-x-2">
-                <Button size="sm" @click.stop="console.log('检出远程分支')">
-                  检出
-                </Button>
-                <Button variant="outline" size="sm" @click.stop="console.log('拉取远程分支')">
-                  拉取
-                </Button>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  </div>
+
+        <div class="border-t my-4"></div>
+
+        <!-- 远程分支列表 -->
+        <div class="space-y-3">
+            <h3 class="text-sm font-medium text-muted-foreground">
+              远程分支 ({{ remoteBranches.length }})
+            </h3>
+
+            <div class="space-y-2">
+              <div
+                v-for="branch in remoteBranches"
+                :key="branch.name"
+                class="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <GitBranch class="h-4 w-4 text-muted-foreground" />
+                    <span class="font-medium truncate">{{ branch.name }}</span>
+                    <Badge variant="outline" class="text-xs">远程</Badge>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="checkoutRemoteBranch(branch.name)"
+                    :disabled="loading"
+                  >
+                    检出
+                  </Button>
+                </div>
+
+                <div v-if="branch.last_commit" class="mt-2 ml-7 text-sm text-muted-foreground">
+                  <p class="truncate">{{ formatCommitMessage(branch.last_commit.message) }}</p>
+                  <div class="flex items-center gap-3 mt-1 text-xs">
+                    <span>{{ branch.last_commit.author_name }}</span>
+                    <span>{{ formatTime(branch.last_commit.timestamp) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
 </template>
