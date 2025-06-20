@@ -419,6 +419,21 @@ export class GitOperationsApi {
     }
   }
 
+  /**
+   * 获取远程URL
+   */
+  async getRemoteUrl(repoPath: string): Promise<string | null> {
+    try {
+      const url = await invoke<string | null>('get_remote_url', {
+        path: repoPath
+      });
+      return url;
+    } catch (error) {
+      console.error('获取远程URL失败:', error);
+      throw new Error(`获取远程URL失败: ${error}`);
+    }
+  }
+
   // ==================== 分支操作 ====================
 
   /**

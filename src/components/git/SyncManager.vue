@@ -120,23 +120,35 @@ const detectProtocolAndAuth = async () => {
 
     if (protocol === 'https') {
       // 获取远程URL并提取域名
-      const remoteInfo = await gitOperationsApi.getRemoteInfo(props.repositoryPath);
-      if (remoteInfo.remote_name) {
-        // 这里需要获取实际的远程URL，暂时使用占位符
-        const domain = 'github.com'; // 实际应该从远程URL提取
-        authStatus.domain = domain;
+      try {
+        const remoteUrl = await gitOperationsApi.getRemoteUrl(props.repositoryPath);
+        if (remoteUrl) {
+          addLog(`检测到远程URL: ${remoteUrl}`);
 
-        // 检查是否有存储的token
-        const token = await gitOperationsApi.getAccessToken(domain);
-        authStatus.hasToken = !!token;
-        authStatus.tokenConfigured = !!token;
+          // 从URL提取域名
+          const domain = await gitOperationsApi.extractDomainFromUrl(remoteUrl);
+          authStatus.domain = domain;
+          addLog(`提取到域名: ${domain}`);
 
-        if (token) {
-          addLog(`找到${domain}的访问令牌`);
-          await gitOperationsApi.updateTokenLastUsed(domain);
+          // 检查是否有存储的token
+          const token = await gitOperationsApi.getAccessToken(domain);
+          authStatus.hasToken = !!token;
+          authStatus.tokenConfigured = !!token;
+
+          if (token) {
+            addLog(`找到${domain}的访问令牌`);
+            await gitOperationsApi.updateTokenLastUsed(domain);
+          } else {
+            addLog(`未找到${domain}的访问令牌`);
+          }
         } else {
-          addLog(`未找到${domain}的访问令牌`);
+          addLog('未找到远程URL');
+          authStatus.domain = '';
         }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '获取远程信息失败';
+        addLog(`获取远程信息失败: ${errorMessage}`);
+        authStatus.domain = '';
       }
     } else if (protocol === 'ssh') {
       addLog('SSH协议将使用系统Git命令');

@@ -64,6 +64,30 @@ const domainInfo = computed(() => {
       helpUrl: 'https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html',
       description: '在GitLab设置中创建Personal Access Token，需要read_repository和write_repository权限'
     };
+  } else if (domain.includes('atomgit.com')) {
+    return {
+      name: 'AtomGit',
+      icon: Globe,
+      color: 'bg-green-600',
+      helpUrl: 'https://atomgit.com/help/user/profile/personal_access_tokens',
+      description: '在AtomGit设置中创建Personal Access Token，需要repo权限'
+    };
+  } else if (domain.includes('gitee.com')) {
+    return {
+      name: 'Gitee',
+      icon: Globe,
+      color: 'bg-red-600',
+      helpUrl: 'https://gitee.com/help/articles/4191',
+      description: '在Gitee设置中创建私人令牌，需要projects权限'
+    };
+  } else if (domain.includes('bitbucket.org')) {
+    return {
+      name: 'Bitbucket',
+      icon: Globe,
+      color: 'bg-blue-700',
+      helpUrl: 'https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/',
+      description: '在Bitbucket设置中创建App Password，需要Repositories权限'
+    };
   } else {
     return {
       name: '自定义Git服务',
