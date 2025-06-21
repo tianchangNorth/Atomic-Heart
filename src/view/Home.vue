@@ -35,12 +35,12 @@ const navigationItems = computed(() => [
     badge: null,
     icon: 'issues' // 问题/Bug图标
   },
-  {
-    path: '/projects',
-    label: '项目',
-    badge: null,
-    icon: 'projects' // 项目管理图标
-  },
+  // {
+  //   path: '/projects',
+  //   label: '项目',
+  //   badge: null,
+  //   icon: 'projects' // 项目管理图标
+  // },
   {
     path: '/local-repositories',
     label: '本地仓库',
