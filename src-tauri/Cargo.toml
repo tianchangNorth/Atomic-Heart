@@ -1,8 +1,8 @@
 [package]
-name = "atomdesk"
+name = "atomicheart"
 version = "0.1.0"
-description = "AtomDesk - Modern Git Repository Management Application"
-authors = ["AtomDesk Team"]
+description = "Atomic Heart - Modern Git Repository Management Application"
+authors = ["Atomic Heart Team"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
