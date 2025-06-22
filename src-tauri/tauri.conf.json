@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "atomdesk",
+  "productName": "Atomic Heart",
   "version": "0.1.0",
   "identifier": "com.tauri-app.app",
   "build": {
@@ -12,18 +12,21 @@
   "app": {
     "windows": [
       {
-        "title": "AtomDesk",
-        "width": 1400,
-        "height": 1000,
+        "title": "Atomic Heart",
+        "width": 1440,
+        "height": 900,
         "devtools": true
       }
     ],
     "security": {
-      "csp": null 
+      "csp": null
     }
   },
+
   "plugins": {
-    "opener": null
+    "opener": null,
+    "dialog": null,
+    "store": null
   },
   "bundle": {
     "active": true,

@@ -137,12 +137,10 @@ onUnmounted(() => {
           enter-to-class="transform translate-y-0 opacity-100"
         >
           <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl shadow-lg mb-4 animate-bounce-gentle">
-              <svg class="w-8 h-8 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
+            <div class="inline-flex items-center bg-gray-50 justify-center w-16 h-16 p-2 rounded-2xl shadow-lg mb-4 animate-bounce-gentle">
+              <img src="@/assets/icon.png">
             </div>
-            <h1 class="text-3xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+            <h1 class="text-3xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-blue-600 bg-clip-text">
               AtomGit
             </h1>
             <p class="text-muted-foreground">现代化的代码托管平台</p>
@@ -186,9 +184,6 @@ onUnmounted(() => {
                     leave-to-class="transform rotate-180 opacity-0"
                   >
                     <Loader2 v-if="loading" class="mr-3 h-5 w-5 animate-spin" />
-                    <svg v-else class="mr-3 h-5 w-5 transition-transform group-hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
                   </Transition>
 
                   <span class="transition-all duration-300">

@@ -1,7 +1,7 @@
 {
-  "name": "atomdesk",
+  "name": "atomicheart",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,9 @@
     "@fabianlars/tauri-plugin-oauth": "2",
     "@tailwindcss/vite": "^4.1.8",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.2.2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "^2.2.0",
     "@vueuse/core": "^13.3.0",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",

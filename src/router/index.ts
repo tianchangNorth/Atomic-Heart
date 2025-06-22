@@ -8,7 +8,10 @@ import Overview from '@/view/Overview.vue'
 import Issues from '@/view/Issues.vue'
 import Repositories from '@/view/Repositories.vue'
 import RepositoryDetail from '@/view/RepositoryDetail.vue'
+import LocalRepository from '@/view/LocalRepository.vue'
+import LocalRepositoryDetail from '@/view/LocalRepositoryDetail.vue'
 import Projects from '@/view/Projects.vue'
+import Settings from '@/view/Settings.vue'
 
 const routes = [
   {
@@ -19,7 +22,10 @@ const routes = [
       { path: '/overview', component: Overview, name: 'Overview' },
       { path: '/issues', component: Issues, name: 'Issues' },
       { path: '/repositories', component: Repositories, name: 'Repositories' },
+      { path: '/local-repositories', component: LocalRepository, name: 'LocalRepository' },
+      { path: '/local-repositories/:id', component: LocalRepositoryDetail, name: 'LocalRepositoryDetail', props: true },
       { path: '/projects', component: Projects, name: 'Projects' },
+      { path: '/settings', component: Settings, name: 'Settings' },
     ]
   },
   {

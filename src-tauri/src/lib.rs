@@ -1,6 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri::{ Emitter };
 mod http_client; // 导入新模块
+mod git;
+mod commands;
+mod utils;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -69,13 +72,74 @@ async fn open_url(url: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_oauth::init())
+        .manage(commands::git::GitState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             open_url,
             start_oauth_callback_server, // 添加新命令
             http_client::http_get,
-            http_client::http_post
+            http_client::http_post,
+            // Git 命令
+            commands::git::clone_repository,
+            commands::git::validate_repository_url,
+            commands::git::detect_auth_type,
+            commands::git::get_default_ssh_keys,
+            commands::git::validate_ssh_key,
+            commands::git::store_credentials,
+            commands::git::load_credentials,
+            commands::git::delete_credentials,
+            commands::git::extract_username_from_url,
+            commands::git::cancel_clone_operation,
+            commands::git::get_clone_operation_status,
+            commands::git::cleanup_clone_operation,
+            commands::git::select_directory,
+            commands::git::select_ssh_key_file,
+            commands::git::validate_clone_directory,
+            // 新增的 Git 信息获取命令
+            commands::git::is_git_repository,
+            commands::git::get_repository_info,
+            commands::git::get_current_branch,
+            commands::git::get_remote_url,
+            commands::git::open_folder,
+            // Git 操作命令
+            commands::git::get_repository_status,
+            commands::git::stage_files,
+            commands::git::unstage_files,
+            commands::git::create_commit,
+            commands::git::get_commit_history,
+            commands::git::get_file_diff,
+            // 同步操作命令
+            commands::git::fetch_remote,
+            commands::git::pull_remote,
+            commands::git::push_remote,
+            commands::git::get_remote_info,
+            // 智能Git操作（支持Token认证）
+            commands::git::smart_fetch_remote,
+            commands::git::smart_push_remote,
+            // 双协议认证系统
+            commands::git::detect_repository_protocol,
+            commands::git::extract_domain_from_url,
+            commands::git::store_access_token,
+            commands::git::get_access_token,
+            commands::git::delete_access_token,
+            commands::git::get_all_tokens,
+            commands::git::update_token_last_used,
+            // 系统Git命令
+            commands::git::fetch_remote_with_system_git,
+            commands::git::push_remote_with_system_git,
+            commands::git::pull_remote_with_system_git,
+            // 远程名称检测
+            commands::git::detect_repository_remotes,
+            commands::git::get_default_remote_name_command,
+            // 分支管理
+            commands::git::list_branches,
+            commands::git::create_branch,
+            commands::git::switch_branch,
+            commands::git::delete_branch,
+            commands::git::checkout_remote_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

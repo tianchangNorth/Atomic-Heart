@@ -8,6 +8,19 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { $fetch } from '@/utils/fetch';
 import { invoke } from '@tauri-apps/api/core'
+import { useToast } from '@/components/ui/toast';
+import {
+  RefreshCw,
+  Plus,
+  Search,
+  AlertTriangle,
+  ClipboardList,
+  Info,
+  CheckCircle,
+  Lock,
+  Database,
+  ExternalLink
+} from 'lucide-vue-next';
 
 // Issue 数据结构定义
 interface Issue {
@@ -47,6 +60,7 @@ const activeFilter = ref('all'); // 'all' | 'open' | 'closed'
 const searchQuery = ref('');
 const loading = ref(false);
 const error = ref<string | null>(null);
+const { warning } = useToast();
 
 // Issues 数据
 const assignedIssues = ref<Issue[]>([]);
@@ -180,14 +194,12 @@ const getRepositoryName = (repositoryUrl: string): string => {
 
 // 处理操作
 const handleIssueClick = (issue: Issue) => {
-  console.log('查看 Issue:', issue.html_url);
   // 这里可以添加路由跳转逻辑
   invoke('open_url', { url: issue.html_url });
 };
 
 const handleCreateIssue = () => {
-  console.log('创建新 Issue');
-  // 这里可以添加创建 Issue 的逻辑
+  warning('功能开发中...');
 };
 
 const handleRefresh = () => {
@@ -232,16 +244,12 @@ onMounted(() => {
         <p class="text-muted-foreground">跟踪和管理项目问题</p>
       </div>
       <div class="flex items-center space-x-2">
-        <Button variant="outline" @click="handleRefresh" :disabled="loading">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
+        <Button variant="outline" @click="handleRefresh" :disabled="loading" class="cursor-pointer">
+          <RefreshCw class="w-4 h-4 mr-2" />
           刷新
         </Button>
-        <Button @click="handleCreateIssue">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-          </svg>
+        <Button @click="handleCreateIssue" class="cursor-pointer">
+          <Plus class="w-4 h-4 mr-2" />
           新建 Issue
         </Button>
       </div>
@@ -273,9 +281,7 @@ onMounted(() => {
               placeholder="搜索 Issues..."
               class="pl-8 w-64"
             />
-            <svg class="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
+            <Search class="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           </div>
 
           <div class="flex space-x-1">
@@ -318,39 +324,29 @@ onMounted(() => {
         <!-- 错误状态 -->
         <div v-else-if="error" class="text-center py-12">
           <div class="text-muted-foreground mb-4">
-            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-            </svg>
+            <AlertTriangle class="w-12 h-12 mx-auto mb-2" />
             <p class="text-sm">{{ error }}</p>
           </div>
           <Button variant="outline" @click="getAssignedIssues">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+            <RefreshCw class="w-4 h-4 mr-2" />
             重试
           </Button>
         </div>
 
         <!-- 空状态 -->
         <div v-else-if="filteredIssues.length === 0 && currentIssues.length === 0" class="text-center py-12">
-          <svg class="w-16 h-16 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
+          <ClipboardList class="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold text-foreground mb-2">还没有 Issues</h3>
           <p class="text-muted-foreground mb-4">暂无分配给您的 Issues</p>
           <Button @click="handleCreateIssue">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
+            <Plus class="w-4 h-4 mr-2" />
             新建 Issue
           </Button>
         </div>
 
         <!-- 搜索无结果 -->
         <div v-else-if="filteredIssues.length === 0" class="text-center py-12">
-          <svg class="w-16 h-16 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-          </svg>
+          <Search class="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold text-foreground mb-2">未找到匹配的 Issues</h3>
           <p class="text-muted-foreground mb-4">尝试调整搜索条件或筛选器</p>
           <Button variant="outline" @click="searchQuery = ''; activeFilter = 'all'">
@@ -378,12 +374,8 @@ onMounted(() => {
                     : 'bg-purple-100 text-purple-600'
                 ]"
               >
-                <svg v-if="issue.state === 'open'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                </svg>
-                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                </svg>
+                <Info v-if="issue.state === 'open'" class="w-4 h-4" />
+                <CheckCircle v-else class="w-4 h-4" />
               </div>
             </div>
 
@@ -400,9 +392,7 @@ onMounted(() => {
                       {{ issue.state === 'open' ? '开放' : '已关闭' }}
                     </Badge>
                     <Badge v-if="issue.locked" variant="outline">
-                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                      </svg>
+                      <Lock class="w-3 h-3 mr-1" />
                       锁定
                     </Badge>
                   </div>
@@ -453,9 +443,7 @@ onMounted(() => {
 
                     <!-- 仓库信息 -->
                     <div class="flex items-center space-x-1">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                      </svg>
+                      <Database class="w-4 h-4" />
                       <span>{{ getRepositoryName(issue.repository_url) }}</span>
                     </div>
 
@@ -478,9 +466,7 @@ onMounted(() => {
                     @click.stop="handleIssueClick(issue)"
                     title="查看详情"
                   >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                    </svg>
+                    <ExternalLink class="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -501,39 +487,29 @@ onMounted(() => {
         <!-- 错误状态 -->
         <div v-else-if="error" class="text-center py-12">
           <div class="text-muted-foreground mb-4">
-            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-            </svg>
+            <AlertTriangle class="w-12 h-12 mx-auto mb-2" />
             <p class="text-sm">{{ error }}</p>
           </div>
           <Button variant="outline" @click="getCreatedIssues">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+            <RefreshCw class="w-4 h-4 mr-2" />
             重试
           </Button>
         </div>
 
         <!-- 空状态 -->
         <div v-else-if="filteredIssues.length === 0 && currentIssues.length === 0" class="text-center py-12">
-          <svg class="w-16 h-16 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
+          <ClipboardList class="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold text-foreground mb-2">还没有 Issues</h3>
           <p class="text-muted-foreground mb-4">您还没有创建任何 Issues</p>
           <Button @click="handleCreateIssue">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
+            <Plus class="w-4 h-4 mr-2" />
             新建 Issue
           </Button>
         </div>
 
         <!-- 搜索无结果 -->
         <div v-else-if="filteredIssues.length === 0" class="text-center py-12">
-          <svg class="w-16 h-16 mx-auto text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-          </svg>
+          <Search class="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h3 class="text-lg font-semibold text-foreground mb-2">未找到匹配的 Issues</h3>
           <p class="text-muted-foreground mb-4">尝试调整搜索条件或筛选器</p>
           <Button variant="outline" @click="searchQuery = ''; activeFilter = 'all'">
@@ -561,12 +537,8 @@ onMounted(() => {
                         : 'bg-purple-100 text-purple-600'
                     ]"
                   >
-                    <svg v-if="issue.state === 'open'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                    </svg>
+                    <Info v-if="issue.state === 'open'" class="w-4 h-4" />
+                    <CheckCircle v-else class="w-4 h-4" />
                   </div>
                 </div>
 
@@ -583,9 +555,7 @@ onMounted(() => {
                           {{ issue.state === 'open' ? '开放' : '已关闭' }}
                         </Badge>
                         <Badge v-if="issue.locked" variant="outline">
-                          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                          </svg>
+                          <Lock class="w-3 h-3 mr-1" />
                           锁定
                         </Badge>
                       </div>
@@ -636,9 +606,7 @@ onMounted(() => {
 
                         <!-- 仓库信息 -->
                         <div class="flex items-center space-x-1">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                          </svg>
+                          <Database class="w-4 h-4" />
                           <span>{{ getRepositoryName(issue.repository_url) }}</span>
                         </div>
 
@@ -661,9 +629,7 @@ onMounted(() => {
                         @click.stop="handleIssueClick(issue)"
                         title="查看详情"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                        </svg>
+                        <ExternalLink class="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
