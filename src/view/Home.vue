@@ -11,7 +11,6 @@ import { useLocalRepositories } from '@/composables/useLocalRepositories';
 import { extractRepositoryName } from '@/utils/utils';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  Layers3,
   Search,
   Plus,
   Bell,
@@ -155,10 +154,10 @@ onMounted(async () => {
           <div class="flex items-center space-x-8">
             <div class="flex items-center space-x-3">
               <!-- AtomGit Logo -->
-              <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Layers3 class="w-5 h-5 text-primary-foreground" />
+              <div class="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
+                <img src="@/assets/icon.png">
               </div>
-              <h1 class="text-xl font-bold text-foreground">AtomGit</h1>
+              <h1 class="text-xl font-bold text-foreground">Atomic Heart</h1>
             </div>
 
             <!-- 快速搜索 -->
