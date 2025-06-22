@@ -7,6 +7,11 @@ import { $fetch } from '@/utils/fetch';
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
+import { useToast } from '@/components/ui/toast';
+import RepoClone from '@/components/git/RepoClone.vue';
+import { useLocalRepositories } from '@/composables/useLocalRepositories';
+import { extractRepositoryName } from '@/utils/utils';
+
 import {
   Upload,
   Plus,
@@ -14,7 +19,7 @@ import {
   GitFork,
   Users,
   Settings,
-  Database,
+  Globe,
   Heart,
   AlertTriangle,
   FileText,
@@ -45,14 +50,18 @@ interface Activity {
   };
 }
 
+const { warning } = useToast();
+
 const userStore = useUserStore();
 const { user } = userStore;
+const { addRepository } = useLocalRepositories();
 const router = useRouter();
 
 // 活动数据状态
 const recentActivity = ref<Activity[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const showCloneDialog = ref(false);
 
 // 获取活动数据
 const fetchRecentActivity = async () => {
@@ -188,6 +197,38 @@ const handleRepoClick = (repoUrl: string) => {
   invoke('open_url', { url: repoUrl });
 };
 
+const createRepo = () => {
+  invoke('open_url', { url: 'https://atomgit.com/project/new' });
+};
+
+const handleCloneRepo = () => {
+  showCloneDialog.value = true;
+};
+
+const handleCloneSuccess = async (result: any) => {
+  try {
+    if (result.success && result.repository_path) {
+      const repoUrl = result.repository_url || '';
+      const repoName = extractRepositoryName(repoUrl);
+
+      await addRepository({
+        name: repoName,
+        path: result.repository_path,
+        remoteUrl: repoUrl || undefined,
+        currentBranch: result.branch || undefined
+      });
+
+      showCloneDialog.value = false;
+    }
+  } catch (error) {
+    console.error('处理克隆成功事件时出错:', error);
+  }
+};
+
+const importRepos = () => {
+  warning('功能开发中...');
+};
+
 // 组件挂载时获取数据
 onMounted(() => {
   fetchRecentActivity();
@@ -208,11 +249,11 @@ onMounted(() => {
         <CardContent class="p-6 cursor-pointer" @click="() => { router.push('/repositories') }">
           <div class="flex items-center justify-between" >
             <div>
-              <p class="text-sm font-medium text-muted-foreground">总仓库数</p>
+              <p class="text-sm font-medium text-muted-foreground">远程仓库数</p>
               <p class="text-2xl font-bold text-foreground">{{ user.total_repos || 0 }}</p>
             </div>
             <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Database class="w-6 h-6 text-primary" />
+              <Globe  class="w-6 h-6 text-primary" />
             </div>
           </div>
         </CardContent>
@@ -251,7 +292,7 @@ onMounted(() => {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-muted-foreground">未处理任务</p>
-              <p class="text-2xl font-bold text-foreground">12</p>
+              <p class="text-2xl font-bold text-foreground">开发中...</p>
             </div>
             <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
               <AlertTriangle class="w-6 h-6 text-orange-500" />
@@ -365,15 +406,15 @@ onMounted(() => {
         </CardHeader>
         <CardContent>
           <div class="grid grid-cols-2 gap-4">
-            <Button variant="outline" class="h-20 flex-col space-y-2">
+            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="createRepo()">
               <Plus class="w-6 h-6" />
               <span class="text-sm">新建仓库</span>
             </Button>
-            <Button variant="outline" class="h-20 flex-col space-y-2">
+            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="handleCloneRepo">
               <Upload class="w-6 h-6" />
-              <span class="text-sm">导入仓库</span>
+              <span class="text-sm">克隆仓库</span>
             </Button>
-            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer">
+            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="importRepos()">
               <UserPlus class="w-6 h-6" />
               <span class="text-sm">加入组织</span>
             </Button>
@@ -384,6 +425,24 @@ onMounted(() => {
           </div>
         </CardContent>
       </Card>
+    </div>
+
+    <!-- 克隆仓库对话框 -->
+    <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
+        <div class="relative">
+          <Button
+            variant="ghost"
+            class="absolute top-4 right-32 z-10 cursor-pointer"
+            @click="showCloneDialog = false"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </Button>
+          <RepoClone @cloneSuccess="handleCloneSuccess" />
+        </div>
+      </div>
     </div>
   </div>
 </template>

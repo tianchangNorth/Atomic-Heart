@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button';
 import { delToken } from '@/utils/token';
 import NotificationPanel from '@/components/ui/notification/NotificationPanel.vue';
 import { initializeNotifications, unreadCount } from '@/services/notificationService';
+import RepoClone from '@/components/git/RepoClone.vue';
+import { useLocalRepositories } from '@/composables/useLocalRepositories';
+import { extractRepositoryName } from '@/utils/utils';
+import { invoke } from '@tauri-apps/api/core';
 import {
   Layers3,
   Search,
@@ -19,7 +23,6 @@ import {
   ClipboardList,
   Folder,
   Settings,
-  UserPlus,
   Upload
 } from 'lucide-vue-next';
 
@@ -29,7 +32,9 @@ const userStore = useUserStore();
 
 // 响应式数据
 const { user } = userStore;
+const { addRepository } = useLocalRepositories();
 const showNotifications = ref(false);
+const showCloneDialog = ref(false);
 
 // 导航项配置
 const navigationItems = computed(() => [
@@ -92,6 +97,35 @@ const getNavItemClass = (path: string) => {
       ? 'bg-primary text-primary-foreground'
       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
   ];
+};
+
+const handleCreateRepo = () => {
+  invoke('open_url', { url: 'https://atomgit.com/project/new' });
+};
+
+// 克隆仓库相关方法
+const handleCloneRepo = () => {
+  showCloneDialog.value = true;
+};
+
+const handleCloneSuccess = async (result: any) => {
+  try {
+    if (result.success && result.repository_path) {
+      const repoUrl = result.repository_url || '';
+      const repoName = extractRepositoryName(repoUrl);
+
+      await addRepository({
+        name: repoName,
+        path: result.repository_path,
+        remoteUrl: repoUrl || undefined,
+        currentBranch: result.branch || undefined
+      });
+
+      showCloneDialog.value = false;
+    }
+  } catch (error) {
+    console.error('处理克隆成功事件时出错:', error);
+  }
 };
 
 // 退出登录
@@ -259,17 +293,13 @@ onMounted(async () => {
           <!-- 快速操作 -->
           <div class="mt-8 space-y-3">
             <h4 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">快速操作</h4>
-            <Button variant="outline" size="sm" class="w-full justify-start">
+            <Button variant="outline" size="sm" class="w-full justify-start cursor-pointer" @click="handleCreateRepo()">
               <Plus class="w-4 h-4 mr-2" />
               新建仓库
             </Button>
-            <Button variant="outline" size="sm" class="w-full justify-start">
-              <UserPlus class="w-4 h-4 mr-2" />
-              加入组织
-            </Button>
-            <Button variant="outline" size="sm" class="w-full justify-start">
+            <Button variant="outline" size="sm" class="w-full justify-start cursor-pointer" @click="handleCloneRepo">
               <Upload class="w-4 h-4 mr-2" />
-              导入仓库
+              克隆仓库
             </Button>
           </div>
         </div>
@@ -303,6 +333,24 @@ onMounted(async () => {
           />
         </div>
       </Transition>
+    </div>
+
+    <!-- 克隆仓库对话框 -->
+    <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
+        <div class="relative">
+          <Button
+            variant="ghost"
+            class="absolute top-4 right-32 z-10 cursor-pointer"
+            @click="showCloneDialog = false"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </Button>
+          <RepoClone @cloneSuccess="handleCloneSuccess" />
+        </div>
+      </div>
     </div>
   </div>
 </template>

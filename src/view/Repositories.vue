@@ -11,6 +11,7 @@ import RepoClone from '@/components/git/RepoClone.vue';
 import { getToken } from '@/utils/token';
 import { useLocalRepositories } from '@/composables/useLocalRepositories';
 import { extractRepositoryName } from '@/utils/utils'
+import { invoke } from '@tauri-apps/api/core';
 
 // 定义仓库数据接口
 interface Repository {
@@ -201,7 +202,7 @@ const handleViewRepo = (repo: Repository) => {
 
 const handleCreateRepo = () => {
   // 跳转到创建仓库页面
-  console.log('创建新仓库');
+  invoke('open_url', { url: 'https://atomgit.com/project/new' });
 };
 
 const handleCloneSuccess = async (result: any) => {
@@ -280,7 +281,7 @@ onMounted(() => {
         <p class="text-muted-foreground">管理您的代码仓库</p>
       </div>
       <div class="flex gap-2">
-        <Button @click="handleCreateRepo" class="self-start sm:self-auto">
+        <Button @click="handleCreateRepo" class="self-start sm:self-auto cursor-pointer">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
           </svg>
