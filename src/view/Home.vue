@@ -10,6 +10,7 @@ import RepoClone from '@/components/git/RepoClone.vue';
 import { useLocalRepositories } from '@/composables/useLocalRepositories';
 import { extractRepositoryName } from '@/utils/utils';
 import { invoke } from '@tauri-apps/api/core';
+import { useToast } from '@/components/ui/toast';
 import {
   Search,
   Plus,
@@ -29,6 +30,7 @@ import {
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
+const { success } = useToast();
 
 // 响应式数据
 const { user } = userStore;
@@ -120,8 +122,9 @@ const handleCloneSuccess = async (result: any) => {
         remoteUrl: repoUrl || undefined,
         currentBranch: result.branch || undefined
       });
-
       showCloneDialog.value = false;
+      success('仓库克隆成功');
+      router.push('/local-repositories');
     }
   } catch (error) {
     console.error('处理克隆成功事件时出错:', error);

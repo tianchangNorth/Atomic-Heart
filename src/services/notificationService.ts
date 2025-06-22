@@ -58,6 +58,7 @@ export const fetchNotifications = async () => {
 };
 
 // 标记单个通知为已读
+// 由于openapi不支持信息操作，所以这里使用本地更新
 export const markAsRead = async (notificationId: string) => {
   try {
     await $fetch(`/notifications/${notificationId}/read`, { method: 'post' });

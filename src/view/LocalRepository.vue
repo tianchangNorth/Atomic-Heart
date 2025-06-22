@@ -10,6 +10,7 @@ import type { LocalRepository } from '@/types/local-repository';
 import { extractRepositoryName } from '@/utils/utils'
 import RepoClone from '@/components/git/RepoClone.vue';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useToast } from '@/components/ui/toast';
 import {
   RefreshCw,
   FolderOpen,
@@ -44,6 +45,7 @@ const {
 const showCloneDialog = ref(false);
 const searchQuery = ref('');
 const viewMode = ref<'grid' | 'list'>('grid');
+const { success } = useToast();
 
 // 计算属性
 const repositoryStats = computed(() => {
@@ -145,8 +147,6 @@ const handleRefreshAll = async () => {
 // 处理克隆成功事件
 const handleCloneSuccess = async (result: any) => {
   try {
-    console.log('克隆成功事件数据:', result); // 调试日志
-
     if (result.success && result.repository_path) {
       // 从 URL 中提取仓库名称
       const repoUrl = result.repository_url || '';
@@ -168,9 +168,9 @@ const handleCloneSuccess = async (result: any) => {
       });
 
       if (addResult.success) {
-        console.log('仓库已自动添加到本地列表:', repoName);
         // 关闭克隆对话框
-        // showCloneDialog.value = false;
+        showCloneDialog.value = false;
+        success('仓库克隆成功');
       } else {
         console.error('添加仓库到本地列表失败:', addResult.message);
       }
@@ -181,11 +181,6 @@ const handleCloneSuccess = async (result: any) => {
     console.error('处理克隆成功事件时出错:', error);
   }
 };
-
-// 将 SSH URL 转换为 HTTPS URL（暂时保留，未来可能用于自动回退）
-// const convertSshToHttps = (sshUrl: string): string => {
-//   // 实现逻辑...
-// };
 
 // 从路径中提取文件夹名称
 const extractFolderName = (path: string): string => {
@@ -210,9 +205,6 @@ const handleImportRepository = async () => {
 
     if (selectedPath && typeof selectedPath === 'string') {
       // 验证选择的文件夹是否为 Git 仓库
-      // 这里暂时跳过验证，直接添加
-      // TODO: 后续需要添加 Tauri 命令来验证 Git 仓库
-
       const repoName = extractFolderName(selectedPath);
 
       // 添加到本地仓库列表

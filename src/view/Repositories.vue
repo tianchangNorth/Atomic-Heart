@@ -12,6 +12,7 @@ import { getToken } from '@/utils/token';
 import { useLocalRepositories } from '@/composables/useLocalRepositories';
 import { extractRepositoryName } from '@/utils/utils'
 import { invoke } from '@tauri-apps/api/core';
+import { useToast } from '@/components/ui/toast';
 
 // 定义仓库数据接口
 interface Repository {
@@ -32,6 +33,7 @@ interface Repository {
 const router = useRouter();
 const userStore = useUserStore();
 const { user } = userStore;
+const { success } = useToast();
 
 // 状态管理
 const repositories = ref<Repository[]>([]);
@@ -222,7 +224,9 @@ const handleCloneSuccess = async (result: any) => {
 
       if (addResult.success) {
         // 关闭克隆对话框
-        // showCloneDialog.value = false;
+        showCloneDialog.value = false;
+        success('仓库克隆成功');
+        router.push('/local-repositories');
       } else {
         console.error('添加仓库到本地列表失败:', addResult.message);
       }

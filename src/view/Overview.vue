@@ -27,6 +27,7 @@ import {
   UserPlus,
   Download,
   CircleDot,
+  Folder,
   X
 } from 'lucide-vue-next'
 
@@ -53,11 +54,11 @@ interface Activity {
   };
 }
 
-const { warning } = useToast();
+const { success, warning } = useToast();
 
 const userStore = useUserStore();
 const { user } = userStore;
-const { addRepository } = useLocalRepositories();
+const { addRepository, repositoryCount } = useLocalRepositories();
 const router = useRouter();
 
 // 活动数据状态
@@ -220,8 +221,9 @@ const handleCloneSuccess = async (result: any) => {
         remoteUrl: repoUrl || undefined,
         currentBranch: result.branch || undefined
       });
-
       showCloneDialog.value = false;
+      success('仓库克隆成功');
+      router.push('/local-repositories');
     }
   } catch (error) {
     console.error('处理克隆成功事件时出错:', error);
@@ -263,6 +265,20 @@ onMounted(() => {
       </Card>
 
       <Card>
+        <CardContent class="p-6" @click="() => { router.push('/local-repositories') }">
+          <div class="flex items-center justify-between cursor-pointer">
+            <div>
+              <p class="text-sm font-medium text-muted-foreground">本地仓库数</p>
+              <p class="text-2xl font-bold text-foreground">{{ repositoryCount }}</p>
+            </div>
+            <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+              <Folder class="w-6 h-6 text-orange-500" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
@@ -285,20 +301,6 @@ onMounted(() => {
             </div>
             <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
               <Heart class="w-6 h-6 text-blue-500" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent class="p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-muted-foreground">未处理任务</p>
-              <p class="text-2xl font-bold text-foreground">coding...</p>
-            </div>
-            <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
-              <AlertTriangle class="w-6 h-6 text-orange-500" />
             </div>
           </div>
         </CardContent>
