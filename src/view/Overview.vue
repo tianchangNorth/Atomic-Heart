@@ -294,7 +294,7 @@ onMounted(() => {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm font-medium text-muted-foreground">未处理任务</p>
-              <p class="text-2xl font-bold text-foreground">开发中...</p>
+              <p class="text-2xl font-bold text-foreground">coding...</p>
             </div>
             <div class="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
               <AlertTriangle class="w-6 h-6 text-orange-500" />

@@ -155,8 +155,8 @@ onMounted(async () => {
           <div class="flex items-center space-x-8">
             <div class="flex items-center space-x-3">
               <!-- AtomGit Logo -->
-              <div class="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                <img src="@/assets/icon.png">
+              <div class="w-8 h-8 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                <img src="@/assets/icon.png" class="w-6 h-6">
               </div>
               <h1 class="text-xl font-bold text-foreground">Atomic Heart</h1>
             </div>

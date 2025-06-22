@@ -137,7 +137,7 @@ onUnmounted(() => {
           enter-to-class="transform translate-y-0 opacity-100"
         >
           <div class="text-center mb-8">
-            <div class="inline-flex items-center bg-gray-50 justify-center w-16 h-16 p-2 rounded-2xl shadow-lg mb-4 animate-bounce-gentle">
+            <div class="inline-flex items-center bg-gray-50 dark:bg-gray-800 justify-center w-16 h-16 p-2 rounded-2xl shadow-lg mb-4 animate-bounce-gentle">
               <img src="@/assets/icon.png">
             </div>
             <h1 class="text-3xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-blue-600 bg-clip-text">
