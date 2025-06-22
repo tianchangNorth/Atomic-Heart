@@ -298,7 +298,7 @@ onMounted(async () => {
               新建仓库
             </Button>
             <Button variant="outline" size="sm" class="w-full justify-start cursor-pointer" @click="handleCloneRepo">
-            <Download class="w-4 h-4 mr-2" />
+              <Download class="w-4 h-4 mr-2" />
               克隆仓库
             </Button>
           </div>

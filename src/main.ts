@@ -5,6 +5,7 @@ import { createPinia } from 'pinia'
 import { createApp } from "vue";
 import { initTheme } from '@/composables/useTheme';
 import { initLocalRepositories } from '@/composables/useLocalRepositories';
+import { deepLinkService } from '@/services/deepLinkService';
 
 import './index.css'
 
@@ -16,7 +17,8 @@ app.use(createPinia());
 // 初始化应用系统
 Promise.all([
   initTheme(),
-  initLocalRepositories()
+  initLocalRepositories(),
+  deepLinkService.initialize()
 ]).then(() => {
   app.mount("#app");
 }).catch((error) => {

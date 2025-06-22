@@ -1,20 +1,16 @@
 <script setup lang="ts">
 // computed 不再需要，因为使用服务中的
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { invoke } from '@tauri-apps/api/core'
 import {
   notifications,
-  loading,
-  hasMore,
   unreadCount,
   markAsRead,
   markAllAsRead,
   dismissNotification,
-  clearAllNotifications,
-  refreshNotifications,
   type Notification
 } from '@/services/notificationService';
 
@@ -92,12 +88,6 @@ const sanitizeHtml = (html: string): string => {
 // fetchNotifications 现在在服务中
 
 // 所有函数现在都在服务中，直接使用导入的函数
-
-const loadMore = async () => {
-  // 实现加载更多逻辑
-  console.log('加载更多通知');
-};
-
 const handleNotificationClick = (notification: Notification) => {
   // 点击通知时自动标记为已读
   if (notification.unread) {
@@ -123,7 +113,7 @@ const openUrl = async (url: string) => {
 </script>
 
 <template>
-  <Card class="w-80 h-[880px] flex flex-col overflow-hidden shadow-lg">
+  <Card class="w-80 h-[790px] flex flex-col overflow-hidden shadow-lg gap-0">
     <!-- 通知头部 -->
     <CardHeader class="pb-3">
       <div class="flex items-center justify-between">
@@ -275,54 +265,6 @@ const openUrl = async (url: string) => {
       </div>
     </CardContent>
     
-    <!-- 底部操作 -->
-    <CardFooter class="p-3 border-t border-border bg-muted/30">
-      <div class="flex justify-between items-center w-full">
-        <Button
-          v-if="hasMore"
-          variant="ghost"
-          size="sm"
-          @click="loadMore"
-          :disabled="loading"
-          class="text-xs h-8"
-        >
-          <svg v-if="loading" class="w-3 h-3 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <svg v-else class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-          加载更多
-        </Button>
-
-        <div class="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            @click="refreshNotifications"
-            :disabled="loading"
-            class="h-8 w-8 p-0"
-          >
-            <svg class="w-3 h-3" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-          </Button>
-
-          <Button
-            v-if="notifications.length > 0"
-            variant="ghost"
-            size="sm"
-            @click="clearAllNotifications"
-            class="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-          >
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-          </Button>
-        </div>
-      </div>
-    </CardFooter>
   </Card>
 </template>
 

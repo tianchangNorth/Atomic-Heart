@@ -1,8 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri::{ Emitter };
-mod http_client; // 导入新模块
-mod git;
+use tauri::{Emitter, Manager};
 mod commands;
+mod git;
+mod http_client; // 导入新模块
 mod utils;
 
 #[tauri::command]
@@ -24,9 +24,9 @@ async fn start_oauth_callback_server(app_handle: tauri::AppHandle) -> Result<Str
             handle.abort(); // 停止之前的服务器
         }
     }
-    
+
     let app_handle = Arc::new(app_handle);
-    
+
     // 创建回调路由
     let callback = warp::path("callback")
         .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -34,32 +34,55 @@ async fn start_oauth_callback_server(app_handle: tauri::AppHandle) -> Result<Str
         .and_then(|params: std::collections::HashMap<String, String>, app_handle: Arc<tauri::AppHandle>| async move {
             let code = params.get("code").cloned();
             let state = params.get("state").cloned();
-            
-            if let (Some(code), Some(state)) = (code, state) {
+
+            // 发送事件到前端
+            if let (Some(ref code_val), Some(ref state_val)) = (&code, &state) {
                 let _ = app_handle.emit("oauth-callback", serde_json::json!({
-                    "code": code,
-                    "state": state
+                    "code": code_val,
+                    "state": state_val
                 }));
             }
-            
+
+            // 准备用于HTML的值
+            let code_str = code.as_deref().unwrap_or("");
+            let state_str = state.as_deref().unwrap_or("");
+
             Ok::<_, warp::Rejection>(warp::reply::html(
-                "<html><body><h1>授权成功！</h1><p>您可以关闭此页面并返回应用。</p><script>setTimeout(() => window.close(), 2000);</script></body></html>"
+                format!(
+                    r#"<html>
+                    <head><title>授权成功</title></head>
+                    <body>
+                        <h1>授权成功！</h1>
+                        <p>正在返回应用...</p>
+                        <script>
+                            // 尝试通过深度链接唤起应用
+                            const deepLink = 'atomic-heart://auth/callback?code={}&state={}';
+                            window.location.href = deepLink;
+
+                            // 如果深度链接失败，显示手动操作提示
+                            setTimeout(() => {{
+                                document.body.innerHTML = '<h1>授权成功！</h1><p>请返回应用继续操作。如果应用没有自动打开，请手动打开应用。</p>';
+                            }}, 3000);
+                        </script>
+                    </body>
+                    </html>"#,
+                    code_str,
+                    state_str
+                )
             ))
         });
-    
+
     let port = 8080;
     let handle = tokio::spawn(async move {
-        warp::serve(callback)
-            .run(([127, 0, 0, 1], port))
-            .await;
+        warp::serve(callback).run(([127, 0, 0, 1], port)).await;
     });
-    
+
     // 保存服务器句柄
     {
         let mut state = SERVER_STATE.lock().unwrap();
         *state = Some(handle);
     }
-    
+
     Ok(format!("http://localhost:{}/callback", port))
 }
 
@@ -68,18 +91,129 @@ async fn open_url(url: String) -> Result<(), String> {
     open::that(url).map_err(|e| e.to_string())
 }
 
+// 处理深度链接的命令
+#[tauri::command]
+async fn handle_deep_link(app_handle: tauri::AppHandle, url: String) -> Result<(), String> {
+    println!("收到深度链接: {}", url);
+
+    // 解析URL参数
+    if let Ok(parsed_url) = url::Url::parse(&url) {
+        let mut params = std::collections::HashMap::new();
+
+        // 提取查询参数
+        for (key, value) in parsed_url.query_pairs() {
+            params.insert(key.to_string(), value.to_string());
+        }
+
+        // 提取路径
+        let path = parsed_url.path();
+
+        // 发送事件到前端
+        let _ = app_handle.emit(
+            "deep-link-received",
+            serde_json::json!({
+                "url": url,
+                "path": path,
+                "params": params
+            }),
+        );
+
+        // 如果窗口被最小化或隐藏，则显示并聚焦
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.unminimize();
+        }
+
+        Ok(())
+    } else {
+        Err("无效的URL格式".to_string())
+    }
+}
+
+// 注册自定义协议的命令
+#[tauri::command]
+async fn register_protocol_handler() -> Result<String, String> {
+    // 在Windows上，协议会在安装时自动注册
+    // 这个命令主要用于获取协议信息
+    Ok("atomic-heart://".to_string())
+}
+
+// 获取启动参数的命令
+#[tauri::command]
+async fn get_startup_args() -> Result<Vec<String>, String> {
+    let args: Vec<String> = std::env::args().collect();
+    Ok(args)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // 配置单实例模式（仅桌面平台）
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            println!("检测到新实例启动，参数: {argv:?}");
+
+            // 将现有窗口置于前台
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.unminimize();
+            }
+
+            // 处理深度链接参数
+            for arg in argv.iter() {
+                if arg.starts_with("atomic-heart://") {
+                    // 发送深度链接事件到现有实例
+                    let _ = app.emit(
+                        "deep-link-received",
+                        serde_json::json!({
+                            "url": arg,
+                            "source": "new_instance"
+                        }),
+                    );
+                    break;
+                }
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_oauth::init())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(commands::git::GitState::default())
+        .setup(|app| {
+            // 设置深度链接处理
+            use tauri_plugin_deep_link::DeepLinkExt;
+
+            // 监听深度链接事件
+            app.deep_link().on_open_url(|event| {
+                println!("深度链接 URLs: {:?}", event.urls());
+                // 这里的事件会被单实例插件处理，主要用于日志记录
+            });
+
+            // 在开发模式下注册深度链接（仅限 Windows 和 Linux）
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                if let Err(e) = app.deep_link().register_all() {
+                    eprintln!("注册深度链接失败: {}", e);
+                }
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             open_url,
             start_oauth_callback_server, // 添加新命令
+            handle_deep_link,
+            register_protocol_handler,
+            get_startup_args,
             http_client::http_get,
             http_client::http_post,
             // Git 命令

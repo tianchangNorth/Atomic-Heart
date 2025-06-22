@@ -26,7 +26,12 @@
   "plugins": {
     "opener": null,
     "dialog": null,
-    "store": null
+    "store": null,
+    "deep-link": {
+      "desktop": {
+        "schemes": ["atomic-heart"]
+      }
+    }
   },
   "bundle": {
     "active": true,
@@ -37,6 +42,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Modern Git Repository Management Application",
+    "longDescription": "Atomic Heart is a modern Git repository management application built with Tauri and Vue.js",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"]
+      }
+    }
   }
 }
