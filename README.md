@@ -108,7 +108,7 @@ sudo apt install libwebkit2gtk-4.0-dev \
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/yourusername/atomic-heart.git
+git clone https://atomgit.com/tianchang/AtomicHeart.git
 cd atomic-heart
 ```
 
@@ -336,8 +336,8 @@ pnpm install
 
 ## 联系方式
 
-- **AtomGit Issues**：[提交问题或建议](https://atomgit.com/tianchang/AtomDesk/issues)
-- **Discussions**：[参与讨论](https://atomgit.com/tianchang/AtomDesk/discussions)
+- **AtomGit Issues**：[提交问题或建议](https://atomgit.com/tianchang/AtomicHeart/issues)
+- **Discussions**：[参与讨论](https://atomgit.com/tianchang/AtomicHeart/discussions)
 - **Email**：tianchang488@gamil.com
 
 ---
