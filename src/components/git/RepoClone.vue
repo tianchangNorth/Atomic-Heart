@@ -496,7 +496,7 @@ const resetForm = () => {
 </script>
 
 <template>
-  <Card class="w-full max-w-2xl mx-auto">
+  <Card class="w-full max-w-2xl mx-auto overflow-y-auto max-h-[84vh] scrollbar-hidden pb-3 py-6">
     <CardHeader>
       <CardTitle class="flex items-center space-x-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -558,9 +558,7 @@ const resetForm = () => {
       </div>
 
       <!-- 认证信息 -->
-      <div class="space-y-4 border-t pt-4">
-        <h3 class="text-sm font-medium">认证信息</h3>
-        
+      <div class="space-y-4">        
         <!-- 认证类型选择 -->
         <div class="space-y-2">
           <label class="text-sm font-medium">认证方式</label>
@@ -651,7 +649,7 @@ const resetForm = () => {
       </div>
 
       <!-- 高级选项 -->
-      <div class="border-t pt-4">
+      <!-- <div class="border-t pt-4">
         <Button
           variant="ghost"
           size="sm"
@@ -671,13 +669,11 @@ const resetForm = () => {
         </Button>
 
         <div v-if="showAdvanced" class="space-y-4 pl-6 border-l-2 border-border">
-          <!-- 指定分支 -->
           <div class="space-y-2">
             <label class="text-sm font-medium">指定分支</label>
             <Input v-model="cloneForm.branch" placeholder="留空则使用默认分支" />
           </div>
 
-          <!-- 克隆深度 -->
           <div class="space-y-2">
             <label class="text-sm font-medium">克隆深度</label>
             <Input
@@ -688,7 +684,6 @@ const resetForm = () => {
             />
           </div>
 
-          <!-- 递归克隆 -->
           <div class="flex items-center space-x-2">
             <input 
               id="recursive"
@@ -699,10 +694,10 @@ const resetForm = () => {
             <label for="recursive" class="text-sm font-medium">递归克隆子模块</label>
           </div>
         </div>
-      </div>
+      </div> -->
 
       <!-- 克隆进度 -->
-      <div v-if="isCloning" class="border-t pt-4">
+      <div v-if="isCloning">
         <div class="space-y-4">
           <!-- 阶段指示器 -->
           <div class="flex items-center justify-center space-x-4 py-2">
@@ -833,7 +828,7 @@ const resetForm = () => {
       </div>
 
       <!-- 操作按钮 -->
-      <div class="flex justify-end space-x-3 border-t pt-4">
+      <div class="flex justify-end space-x-3 pt-4">
         <Button variant="outline" @click="resetForm" :disabled="isCloning">
           重置
         </Button>

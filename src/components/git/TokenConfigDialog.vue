@@ -253,7 +253,7 @@ watch(() => props.domain, (newValue) => {
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter class="mt-4">
         <Button variant="outline" @click="handleClose" :disabled="loading">
           取消
         </Button>

@@ -917,30 +917,60 @@ pub fn create_authenticated_callbacks(
     let mut callbacks = RemoteCallbacks::new();
     let _url = repo_url.to_string();
 
+    // 添加认证尝试计数器，防止无限重试
+    let auth_attempts = std::cell::RefCell::new(0);
+
     callbacks.credentials(move |url, username_from_url, allowed_types| {
+        let mut attempts = auth_attempts.borrow_mut();
+        *attempts += 1;
+
         log::debug!(
-            "Git认证回调被调用: url={}, username={:?}, allowed_types={:?}",
+            "Git认证回调被调用: url={}, username={:?}, allowed_types={:?}, 尝试次数={}",
             url,
             username_from_url,
-            allowed_types
+            allowed_types,
+            *attempts
         );
+
+        // 防止无限重试，最多尝试3次
+        if *attempts > 3 {
+            log::error!("认证尝试次数过多，停止重试");
+            return Err(git2::Error::from_str("认证失败：尝试次数过多"));
+        }
 
         // 检查是否是HTTPS协议
         if url.starts_with("https://") || url.starts_with("http://") {
             // 尝试使用Token认证
             if let Some(ref token) = token_cache {
-                log::debug!("使用Token进行HTTPS认证");
+                log::debug!("使用Token进行HTTPS认证 (尝试 {})", *attempts);
 
-                // GitHub和GitLab等服务使用Token作为用户名，密码为空
-                return git2::Cred::userpass_plaintext(token, "");
+                // 对于AtomGit等服务，Token应该作为用户名，密码为空或token
+                // 第一次尝试：token作为用户名，密码为空
+                if *attempts == 1 {
+                    return git2::Cred::userpass_plaintext(token, "");
+                }
+                // 第二次尝试：使用用户名和token作为密码
+                else if *attempts == 2 {
+                    let username = username_from_url.unwrap_or("git");
+                    return git2::Cred::userpass_plaintext(username, token);
+                }
             } else {
                 log::debug!("未找到Token，尝试默认凭据");
+                // 只在第一次尝试时使用默认凭据
+                if *attempts == 1 {
+                    return git2::Cred::default();
+                }
             }
         }
 
         // 对于SSH或其他情况，使用默认凭据
-        log::debug!("使用默认凭据");
-        git2::Cred::default()
+        if *attempts == 1 {
+            log::debug!("使用默认凭据");
+            git2::Cred::default()
+        } else {
+            log::error!("认证失败，无更多认证方式可尝试");
+            Err(git2::Error::from_str("认证失败"))
+        }
     });
 
     // 添加证书检查回调

@@ -373,11 +373,11 @@ onMounted(() => {
               <Upload class="w-6 h-6" />
               <span class="text-sm">导入仓库</span>
             </Button>
-            <Button variant="outline" class="h-20 flex-col space-y-2">
+            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer">
               <UserPlus class="w-6 h-6" />
               <span class="text-sm">加入组织</span>
             </Button>
-            <Button variant="outline" class="h-20 flex-col space-y-2">
+            <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="() => { router.push('/settings') }">
               <Settings class="w-6 h-6" />
               <span class="text-sm">设置</span>
             </Button>

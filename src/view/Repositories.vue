@@ -517,7 +517,7 @@ onMounted(() => {
 
     <!-- 克隆对话框 -->
     <div v-if="showCloneDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-hidden">
-      <div class="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div class="w-full max-w-4xl overflow-hidden">
         <div class="relative scrollbar-hide overflow-y-auto">
           <Button
             variant="ghost"
