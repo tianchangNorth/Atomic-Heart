@@ -3,6 +3,7 @@ use tauri::{ Emitter };
 mod http_client; // 导入新模块
 mod git;
 mod commands;
+mod utils;
 
 #[tauri::command]
 fn greet(name: &str) -> String {

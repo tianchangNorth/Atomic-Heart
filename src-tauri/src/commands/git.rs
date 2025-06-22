@@ -1060,12 +1060,10 @@ pub async fn fetch_remote_with_system_git(
         }
     };
 
-    let output = tokio::process::Command::new("git")
-        .arg("fetch")
-        .arg(&remote)
-        .current_dir(&repo_path)
-        .output()
-        .await;
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+    cmd.arg("fetch").arg(&remote).current_dir(&repo_path);
+
+    let output = cmd.output().await;
 
     match output {
         Ok(output) => {
@@ -1125,7 +1123,7 @@ pub async fn push_remote_with_system_git(
     // 获取当前分支
     let current_branch = get_current_branch_with_git(&repo_path).await?;
 
-    let mut cmd = tokio::process::Command::new("git");
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
     cmd.arg("push");
 
     if force_flag {
@@ -1177,7 +1175,7 @@ pub async fn pull_remote_with_system_git(
         strategy
     );
 
-    let mut cmd = tokio::process::Command::new("git");
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
     cmd.arg("pull");
 
     match strategy.as_str() {
@@ -1243,14 +1241,14 @@ pub async fn pull_remote_with_system_git(
 
 /// 使用系统Git命令获取ahead/behind状态
 async fn get_ahead_behind_with_git(repo_path: &str) -> Result<(i32, i32), String> {
-    let output = tokio::process::Command::new("git")
-        .arg("rev-list")
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+    cmd.arg("rev-list")
         .arg("--left-right")
         .arg("--count")
         .arg("HEAD...@{upstream}")
-        .current_dir(repo_path)
-        .output()
-        .await;
+        .current_dir(repo_path);
+
+    let output = cmd.output().await;
 
     match output {
         Ok(output) => {
@@ -1276,12 +1274,12 @@ async fn get_ahead_behind_with_git(repo_path: &str) -> Result<(i32, i32), String
 
 /// 使用系统Git命令获取当前分支
 async fn get_current_branch_with_git(repo_path: &str) -> Result<String, String> {
-    let output = tokio::process::Command::new("git")
-        .arg("branch")
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+    cmd.arg("branch")
         .arg("--show-current")
-        .current_dir(repo_path)
-        .output()
-        .await;
+        .current_dir(repo_path);
+
+    let output = cmd.output().await;
 
     match output {
         Ok(output) => {
@@ -1302,13 +1300,13 @@ async fn get_current_branch_with_git(repo_path: &str) -> Result<String, String> 
 
 /// 使用系统Git命令获取冲突文件列表
 async fn get_conflict_files_with_git(repo_path: &str) -> Result<Vec<String>, String> {
-    let output = tokio::process::Command::new("git")
-        .arg("diff")
+    let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+    cmd.arg("diff")
         .arg("--name-only")
         .arg("--diff-filter=U")
-        .current_dir(repo_path)
-        .output()
-        .await;
+        .current_dir(repo_path);
+
+    let output = cmd.output().await;
 
     match output {
         Ok(output) => {

@@ -3,6 +3,7 @@ use crate::git::types::{
     CloneOptions, CloneProgress, CloneResult, CloneStage, CloneStats, GitError, NetworkProgress,
     RepositoryInfo,
 };
+use crate::utils::system_command::create_hidden_command;
 use git2::{FetchOptions, Progress, RemoteCallbacks, Repository};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -361,8 +362,6 @@ impl CloneManager {
 
     /// 使用系统Git进行克隆
     fn clone_with_system_git(&self, options: &CloneOptions) -> Result<CloneResult, GitError> {
-        use std::process::Command;
-
         let start_time = std::time::Instant::now();
         let clone_id = uuid::Uuid::new_v4().to_string();
 
@@ -374,7 +373,7 @@ impl CloneManager {
         log::info!("检测到系统Git版本: {}", git_version);
 
         // 构建Git命令
-        let mut cmd = Command::new("git");
+        let mut cmd = create_hidden_command("git");
         cmd.arg("clone");
 
         // 添加分支参数
@@ -442,12 +441,10 @@ impl CloneManager {
 
     /// 检查系统Git是否可用
     fn check_system_git(&self) -> Result<String, GitError> {
-        use std::process::Command;
+        let mut cmd = create_hidden_command("git");
+        cmd.args(&["--version"]);
 
-        let output = Command::new("git")
-            .args(&["--version"])
-            .output()
-            .map_err(|_| GitError::SystemGitNotFound)?;
+        let output = cmd.output().map_err(|_| GitError::SystemGitNotFound)?;
 
         if output.status.success() {
             let version = String::from_utf8_lossy(&output.stdout);
