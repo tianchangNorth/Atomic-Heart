@@ -1,6 +1,6 @@
 [package]
 name = "atomicheart"
-version = "0.1.0"
+version = "1.0.0"
 description = "Atomic Heart - Modern Git Repository Management Application"
 authors = ["Atomic Heart Team"]
 edition = "2021"
