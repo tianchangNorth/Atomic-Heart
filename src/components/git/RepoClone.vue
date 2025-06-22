@@ -8,6 +8,14 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { gitApi, gitCloneManager } from '@/services/git-api';
 import { CloneOptionsBuilder, AuthConfigBuilder, formatBytes, formatDuration } from '@/types/git-backend';
 import type { CloneProgress, AuthType, CloneResult, AuthConfig } from '@/types/git-backend';
+import {
+  Download,
+  Check,
+  Folder,
+  FileText,
+  CheckCircle,
+  X
+} from 'lucide-vue-next';
 
 // Props 定义
 interface Props {
@@ -499,9 +507,7 @@ const resetForm = () => {
   <Card class="w-full max-w-2xl mx-auto overflow-y-auto max-h-[84vh] scrollbar-hidden pb-3 py-6">
     <CardHeader>
       <CardTitle class="flex items-center space-x-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-        </svg>
+        <Download class="w-5 h-5" />
         <span>克隆仓库</span>
       </CardTitle>
     </CardHeader>
@@ -520,9 +526,7 @@ const resetForm = () => {
           />
           <p v-if="urlError" class="text-sm text-red-600">{{ urlError }}</p>
           <div v-else-if="isValidUrl" class="flex items-center space-x-1 text-sm text-green-600">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
+            <Check class="w-4 h-4" />
             <span>有效的仓库地址</span>
           </div>
         </div>
@@ -539,9 +543,7 @@ const resetForm = () => {
               @blur="validateDirectory"
             />
             <Button variant="outline" @click="selectDirectory">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-              </svg>
+              <Folder class="w-4 h-4 mr-2" />
               浏览
             </Button>
           </div>
@@ -549,9 +551,7 @@ const resetForm = () => {
             {{ directoryError }}
           </p>
           <div v-else-if="cloneForm.directory && !directoryError" class="flex items-center space-x-1 text-sm text-green-600">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
+            <Check class="w-4 h-4" />
             <span>目录可用</span>
           </div>
         </div>
@@ -609,9 +609,7 @@ const resetForm = () => {
                 @blur="validateSshKey"
               />
               <Button variant="outline" @click="selectSshKeyFile">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
+                <FileText class="w-4 h-4 mr-2" />
                 选择
               </Button>
             </div>
@@ -801,9 +799,7 @@ const resetForm = () => {
       <div v-if="cloneResult" class="border-t pt-4">
         <div v-if="cloneResult.success" class="p-4 bg-green-50 border border-green-200 rounded-lg">
           <div class="flex items-center space-x-2 text-green-800">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
+            <CheckCircle class="w-5 h-5" />
             <span class="font-medium">克隆成功！</span>
           </div>
           <div class="mt-2 text-sm text-green-700">
@@ -816,9 +812,7 @@ const resetForm = () => {
         </div>
         <div v-else class="p-4 bg-red-50 border border-red-200 rounded-lg">
           <div class="flex items-center space-x-2 text-red-800">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X class="w-5 h-5" />
             <span class="font-medium">克隆失败</span>
           </div>
           <div class="mt-2 text-sm text-red-700">
@@ -837,9 +831,7 @@ const resetForm = () => {
           variant="destructive"
           @click="cancelClone"
         >
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+          <X class="w-4 h-4 mr-2" />
           取消克隆
         </Button>
         <Button
@@ -847,9 +839,7 @@ const resetForm = () => {
           @click="startClone"
           :disabled="!canClone"
         >
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
+          <Download class="w-4 h-4 mr-2" />
           开始克隆
         </Button>
       </div>

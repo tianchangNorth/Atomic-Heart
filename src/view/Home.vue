@@ -22,7 +22,8 @@ import {
   ClipboardList,
   Folder,
   Settings,
-  Upload
+  Download,
+  X
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -297,7 +298,7 @@ onMounted(async () => {
               新建仓库
             </Button>
             <Button variant="outline" size="sm" class="w-full justify-start cursor-pointer" @click="handleCloneRepo">
-              <Upload class="w-4 h-4 mr-2" />
+            <Download class="w-4 h-4 mr-2" />
               克隆仓库
             </Button>
           </div>
@@ -343,9 +344,7 @@ onMounted(async () => {
             class="absolute top-4 right-32 z-10 cursor-pointer"
             @click="showCloneDialog = false"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X class="w-4 h-4" />
           </Button>
           <RepoClone @cloneSuccess="handleCloneSuccess" />
         </div>

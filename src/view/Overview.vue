@@ -24,7 +24,9 @@ import {
   AlertTriangle,
   FileText,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  Download,
+  X
 } from 'lucide-vue-next'
 
 // 定义活动数据接口
@@ -411,7 +413,7 @@ onMounted(() => {
               <span class="text-sm">新建仓库</span>
             </Button>
             <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="handleCloneRepo">
-              <Upload class="w-6 h-6" />
+            <Download class="w-6 h-6" />
               <span class="text-sm">克隆仓库</span>
             </Button>
             <Button variant="outline" class="h-20 flex-col space-y-2 cursor-pointer" @click="importRepos()">
@@ -436,9 +438,7 @@ onMounted(() => {
             class="absolute top-4 right-32 z-10 cursor-pointer"
             @click="showCloneDialog = false"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X class="w-4 h-4" />
           </Button>
           <RepoClone @cloneSuccess="handleCloneSuccess" />
         </div>

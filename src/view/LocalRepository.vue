@@ -10,6 +10,22 @@ import type { LocalRepository } from '@/types/local-repository';
 import { extractRepositoryName } from '@/utils/utils'
 import RepoClone from '@/components/git/RepoClone.vue';
 import { open } from '@tauri-apps/plugin-dialog';
+import {
+  RefreshCw,
+  FolderOpen,
+  Download,
+  Folder,
+  CheckCircle,
+  AlertTriangle,
+  HelpCircle,
+  Search,
+  Grid3X3,
+  List,
+  GitBranch,
+  ExternalLink,
+  Trash2,
+  X
+} from 'lucide-vue-next';
 
 const router = useRouter();
 
@@ -250,21 +266,15 @@ onMounted(async () => {
         </div>
         <div class="flex items-center space-x-3">
           <Button variant="outline" @click="handleRefreshAll">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+            <RefreshCw class="w-4 h-4 mr-2" />
             刷新所有
           </Button>
           <Button variant="outline" @click="handleImportRepository">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-            </svg>
+            <FolderOpen class="w-4 h-4 mr-2" />
             导入本地仓库
           </Button>
           <Button variant="outline" @click="showCloneDialog = true">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
+            <Download class="w-4 h-4 mr-2" />
             克隆仓库
           </Button>
         </div>
@@ -279,9 +289,7 @@ onMounted(async () => {
                 <p class="text-sm font-medium text-muted-foreground">总仓库数</p>
                 <p class="text-2xl font-bold">{{ repositoryStats.total }}</p>
               </div>
-              <svg class="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-              </svg>
+              <Folder class="w-8 h-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
@@ -293,9 +301,7 @@ onMounted(async () => {
                 <p class="text-sm font-medium text-muted-foreground">有效仓库</p>
                 <p class="text-2xl font-bold text-green-600">{{ repositoryStats.valid }}</p>
               </div>
-              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
+              <CheckCircle class="w-8 h-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -307,9 +313,7 @@ onMounted(async () => {
                 <p class="text-sm font-medium text-muted-foreground">无效仓库</p>
                 <p class="text-2xl font-bold text-red-600">{{ repositoryStats.invalid }}</p>
               </div>
-              <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-              </svg>
+              <AlertTriangle class="w-8 h-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -321,9 +325,7 @@ onMounted(async () => {
                 <p class="text-sm font-medium text-muted-foreground">未知状态</p>
                 <p class="text-2xl font-bold text-yellow-600">{{ repositoryStats.unknown }}</p>
               </div>
-              <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
+              <HelpCircle class="w-8 h-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -333,9 +335,7 @@ onMounted(async () => {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div class="flex-1 max-w-md">
           <div class="relative">
-            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               v-model="searchQuery"
               placeholder="搜索仓库名称或路径..."
@@ -349,41 +349,31 @@ onMounted(async () => {
             size="sm"
             @click="viewMode = 'grid'"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-            </svg>
+            <Grid3X3 class="w-4 h-4" />
           </Button>
           <Button
             :variant="viewMode === 'list' ? 'default' : 'outline'"
             size="sm"
             @click="viewMode = 'list'"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-            </svg>
+            <List class="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       <!-- 仓库列表 -->
       <div v-if="filteredRepositories.length === 0 && searchQuery" class="text-center py-12">
-        <svg class="w-16 h-16 mx-auto mb-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
+        <Search class="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
         <h3 class="text-lg font-medium text-foreground mb-2">未找到匹配的仓库</h3>
         <p class="text-muted-foreground">尝试使用不同的关键词搜索</p>
       </div>
 
       <div v-else-if="filteredRepositories.length === 0" class="text-center py-12">
-        <svg class="w-16 h-16 mx-auto mb-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-        </svg>
+        <Folder class="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
         <h3 class="text-lg font-medium text-foreground mb-2">暂无本地仓库</h3>
         <p class="text-muted-foreground mb-4">开始克隆您的第一个仓库</p>
         <Button @click="showCloneDialog = true">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
+          <Download class="w-4 h-4 mr-2" />
           克隆仓库
         </Button>
       </div>
@@ -406,17 +396,13 @@ onMounted(async () => {
           </CardHeader>
           <CardContent class="space-y-3">
             <div class="flex items-center space-x-2 text-sm text-muted-foreground">
-              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
+              <GitBranch class="w-4 h-4 flex-shrink-0" />
               <span class="font-medium">{{ repo.currentBranch }}</span>
               <!-- Git 状态信息暂时不可用 -->
             </div>
 
             <div class="flex items-center space-x-2 text-sm text-muted-foreground">
-              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-              </svg>
+              <Folder class="w-4 h-4 flex-shrink-0" />
               <span class="truncate">{{ repo.path }}</span>
             </div>
 
@@ -430,9 +416,7 @@ onMounted(async () => {
                   class="h-7 w-7 p-0"
                   title="刷新状态"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                  </svg>
+                  <RefreshCw class="w-3 h-3" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -441,9 +425,7 @@ onMounted(async () => {
                   class="h-7 w-7 p-0"
                   title="在文件管理器中打开"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                  </svg>
+                  <ExternalLink class="w-3 h-3" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -452,9 +434,7 @@ onMounted(async () => {
                   class="h-7 w-7 p-0 text-red-600 hover:text-red-700"
                   title="移除仓库"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
+                  <Trash2 class="w-3 h-3" />
                 </Button>
               </div>
             </div>
@@ -479,9 +459,7 @@ onMounted(async () => {
                 </div>
                 <div class="flex items-center space-x-4">
                   <div class="flex items-center space-x-2 text-sm">
-                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                    <GitBranch class="w-4 h-4 text-muted-foreground" />
                     <span>{{ repo.currentBranch }}</span>
                   </div>
                   <!-- Git 状态信息暂时不可用 -->
@@ -499,9 +477,7 @@ onMounted(async () => {
                   class="h-8 w-8 p-0"
                   title="刷新状态"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                  </svg>
+                  <RefreshCw class="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -510,9 +486,7 @@ onMounted(async () => {
                   class="h-8 w-8 p-0"
                   title="在文件管理器中打开"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                  </svg>
+                  <ExternalLink class="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -521,9 +495,7 @@ onMounted(async () => {
                   class="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                   title="移除仓库"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
+                  <Trash2 class="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -541,9 +513,7 @@ onMounted(async () => {
             class="absolute top-4 right-32 z-10 cursor-pointer"
             @click="showCloneDialog = false"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <X class="w-4 h-4" />
           </Button>
           <RepoClone @cloneSuccess="handleCloneSuccess" />
         </div>
