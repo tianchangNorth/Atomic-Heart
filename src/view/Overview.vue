@@ -26,6 +26,7 @@ import {
   RefreshCw,
   UserPlus,
   Download,
+  CircleDot,
   X
 } from 'lucide-vue-next'
 
@@ -126,7 +127,7 @@ const getActivityIcon = (type: string) => {
       color: 'text-green-500'
     },
     create_issue: {
-      component: AlertTriangle,
+      component: CircleDot,
       color: 'text-orange-500'
     },
     merge_created: {
