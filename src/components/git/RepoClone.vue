@@ -562,7 +562,7 @@ const startClone = async () => {
         }
       },
       (error) => {
-        isCloning.value = false;
+        // 设置错误进度状态，但保持isCloning为true避免闪烁
         cloneProgress.value = {
           id: currentOperationId.value || 'error',
           stage: 'Error',
@@ -572,17 +572,28 @@ const startClone = async () => {
 
         // 发出克隆错误事件
         emit('cloneError', error);
+
+        // 延迟2秒后隐藏进度条，避免闪烁
+        setTimeout(() => {
+          isCloning.value = false;
+        }, 2000);
       }
     );
   } catch (error) {
     errorToast('克隆失败: ' + (error as Error).message);
-    isCloning.value = false;
+
+    // 设置错误进度状态，但保持isCloning为true避免闪烁
     cloneProgress.value = {
       id: 'error',
       stage: 'Error',
       progress: 0,
       message: `启动克隆失败: ${error}`,
     };
+
+    // 延迟2秒后隐藏进度条，避免闪烁
+    setTimeout(() => {
+      isCloning.value = false;
+    }, 2000);
   }
 };
 

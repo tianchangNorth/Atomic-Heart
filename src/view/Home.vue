@@ -12,7 +12,6 @@ import { extractRepositoryName } from '@/utils/utils';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '@/components/ui/toast';
 import {
-  // Search,
   Plus,
   Bell,
   User,
@@ -58,12 +57,6 @@ const navigationItems = computed(() => [
     badge: null,
     icon: 'issues' // 问题/Bug图标
   },
-  // {
-  //   path: '/projects',
-  //   label: '项目',
-  //   badge: null,
-  //   icon: 'projects' // 项目管理图标
-  // },
   {
     path: '/local-repositories',
     label: '本地仓库',
@@ -163,18 +156,6 @@ onMounted(async () => {
               </div>
               <h1 class="text-xl font-bold text-foreground">Atomic Heart</h1>
             </div>
-
-            <!-- 快速搜索 -->
-            <!-- <div class="hidden md:flex items-center">
-              <div class="relative">
-                <input
-                  type="text"
-                  placeholder="搜索仓库、用户..."
-                  class="w-80 px-4 py-2 pl-10 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                >
-                <Search class="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-              </div>
-            </div> -->
           </div>
 
           <!-- 右侧：用户操作区域 -->
