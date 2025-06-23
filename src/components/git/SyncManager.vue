@@ -16,7 +16,14 @@ import {
   GitBranch,
   Key,
   Shield,
-  Wifi
+  Wifi,
+  X,
+  GitMerge,
+  GitPullRequest,
+  Zap,
+  Tag,
+  Settings,
+  ChevronDown
 } from 'lucide-vue-next';
 
 // Props
@@ -35,7 +42,7 @@ const syncStatus = reactive({
   behind: 0,
   conflicts: [] as string[],
   lastSync: null as string | null,
-  remoteStatus: 'unknown' as 'connected' | 'disconnected' | 'unknown'
+  remoteStatus: 'connected' as 'connected' | 'disconnected' | 'unknown'
 });
 
 // 认证状态
@@ -69,6 +76,9 @@ const syncOptions = reactive({
   remoteName: 'origin',
   remoteBranch: 'main'
 });
+
+// 高级选项展开状态
+const showAdvancedOptions = ref(false);
 
 // 操作状态
 const fetchState = ref({ loading: false, error: null as string | null });
@@ -214,7 +224,6 @@ const fetchRemote = async () => {
       syncStatus.remoteStatus = 'connected';
 
       addLog(`获取成功 - 领先 ${result.ahead} 个提交，落后 ${result.behind} 个提交`);
-      success(result.message);
     } else {
       addLog(`获取失败: ${result.message}`);
       error(result.message);
@@ -451,19 +460,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <!-- 左侧：同步状态和操作 -->
-    <div class="lg:col-span-2 space-y-6">
-      <!-- 远程仓库状态 -->
+    <div class="lg:col-span-2 space-y-4">
+      <!-- 合并的状态与操作卡片 -->
       <Card>
-        <CardHeader>
+        <CardHeader class="pb-3">
           <CardTitle class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <GitBranch class="w-5 h-5" />
-              <span>远程仓库状态</span>
+              <span>Git 同步</span>
             </div>
             <div class="flex items-center space-x-2">
-              <Badge 
+              <Badge
                 :variant="isConnected ? 'default' : 'destructive'"
                 class="text-xs"
               >
@@ -476,211 +485,352 @@ onMounted(async () => {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <!-- 协议和认证状态 -->
-          <div class="flex items-center justify-between p-3 bg-muted rounded-lg mb-4">
-            <div class="flex items-center space-x-3">
-              <div class="flex items-center space-x-2">
-                <Shield v-if="authStatus.protocol === 'ssh'" class="w-4 h-4 text-green-600" />
-                <Wifi v-else-if="authStatus.protocol === 'https'" class="w-4 h-4 text-blue-600" />
-                <AlertCircle v-else class="w-4 h-4 text-gray-400" />
-                <span class="text-sm font-medium">
-                  {{ authStatus.protocol === 'ssh' ? 'SSH' : authStatus.protocol === 'https' ? 'HTTPS' : '未知' }}
-                </span>
-              </div>
-              <div v-if="authStatus.domain" class="text-sm text-muted-foreground">
-                {{ authStatus.domain }}
-              </div>
+        <CardContent class="space-y-4">
+          <!-- 紧凑的协议和认证状态 -->
+          <div class="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+            <div class="flex items-center space-x-2">
+              <Shield v-if="authStatus.protocol === 'ssh'" class="w-3 h-3 text-green-600" />
+              <Wifi v-else-if="authStatus.protocol === 'https'" class="w-3 h-3 text-blue-600" />
+              <AlertCircle v-else class="w-3 h-3 text-gray-400" />
+              <span class="font-medium">
+                {{ authStatus.protocol === 'ssh' ? 'SSH' : authStatus.protocol === 'https' ? 'HTTPS' : '未知' }}
+              </span>
+              <span v-if="authStatus.domain" class="text-muted-foreground">{{ authStatus.domain }}</span>
             </div>
             <div class="flex items-center space-x-2">
-              <div v-if="authStatus.protocol === 'https'" class="flex items-center space-x-2">
-                <CheckCircle2 v-if="authStatus.tokenConfigured" class="w-4 h-4 text-green-600" />
-                <AlertCircle v-else class="w-4 h-4 text-orange-600" />
-                <span class="text-sm">
+              <div v-if="authStatus.protocol === 'https'" class="flex items-center space-x-1">
+                <CheckCircle2 v-if="authStatus.tokenConfigured" class="w-3 h-3 text-green-600" />
+                <AlertCircle v-else class="w-3 h-3 text-orange-600" />
+                <span class="text-xs">
                   {{ authStatus.tokenConfigured ? 'Token已配置' : 'Token未配置' }}
                 </span>
                 <Button
                   v-if="!authStatus.tokenConfigured"
                   variant="outline"
                   size="sm"
+                  class="h-6 px-2 text-xs"
                   @click="configureToken"
                 >
                   <Key class="w-3 h-3 mr-1" />
-                  配置Token
+                  配置
                 </Button>
               </div>
-              <div v-else-if="authStatus.protocol === 'ssh'" class="text-sm text-green-600">
-                使用系统SSH
+              <div v-else-if="authStatus.protocol === 'ssh'" class="text-xs text-green-600">
+                系统SSH
               </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-4 text-center">
-            <div class="space-y-2">
-              <div class="text-2xl font-bold text-blue-600">{{ syncStatus.ahead }}</div>
-              <div class="text-sm text-muted-foreground">领先提交</div>
+          <!-- 紧凑的同步状态 -->
+          <div class="grid grid-cols-4 gap-3 text-center">
+            <div class="space-y-1">
+              <div class="text-lg font-bold text-blue-600">{{ syncStatus.ahead }}</div>
+              <div class="text-xs text-muted-foreground">领先</div>
             </div>
-            <div class="space-y-2">
-              <div class="text-2xl font-bold text-orange-600">{{ syncStatus.behind }}</div>
-              <div class="text-sm text-muted-foreground">落后提交</div>
+            <div class="space-y-1">
+              <div class="text-lg font-bold text-orange-600">{{ syncStatus.behind }}</div>
+              <div class="text-xs text-muted-foreground">落后</div>
             </div>
-            <div class="space-y-2">
-              <div class="text-2xl font-bold" :class="statusColor">
-                <AlertCircle v-if="hasConflicts" class="w-8 h-8 mx-auto" />
-                <RefreshCw v-else-if="needsPull || needsPush" class="w-8 h-8 mx-auto" />
-                <CheckCircle2 v-else class="w-8 h-8 mx-auto" />
+            <div class="space-y-1">
+              <div class="text-lg font-bold" :class="statusColor">
+                <AlertCircle v-if="hasConflicts" class="w-5 h-5 mx-auto" />
+                <RefreshCw v-else-if="needsPull || needsPush" class="w-5 h-5 mx-auto" />
+                <CheckCircle2 v-else class="w-5 h-5 mx-auto" />
               </div>
-              <div class="text-sm text-muted-foreground">{{ statusText }}</div>
+              <div class="text-xs text-muted-foreground">{{ statusText }}</div>
             </div>
-          </div>
-          
-          <div v-if="syncStatus.lastSync" class="mt-4 text-center text-sm text-muted-foreground">
-            最后同步：{{ formatLastSync(syncStatus.lastSync) }}
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- 同步选项 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center space-x-2">
-            <RefreshCw class="w-5 h-5" />
-            <span>同步选项</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <!-- 拉取模式 -->
-          <div class="space-y-2">
-            <label class="text-sm font-medium">拉取模式</label>
-            <div class="flex space-x-2">
-              <Button
-                :variant="syncOptions.pullMode === 'merge' ? 'default' : 'outline'"
-                size="sm"
-                @click="syncOptions.pullMode = 'merge'"
-              >
-                Merge
-              </Button>
-              <Button
-                :variant="syncOptions.pullMode === 'rebase' ? 'default' : 'outline'"
-                size="sm"
-                @click="syncOptions.pullMode = 'rebase'"
-              >
-                Rebase
-              </Button>
+            <div class="space-y-1">
+              <div class="text-xs text-muted-foreground">
+                {{ syncStatus.lastSync ? formatLastSync(syncStatus.lastSync) : '未同步' }}
+              </div>
+              <div class="text-xs text-muted-foreground">最后同步</div>
             </div>
           </div>
 
-          <!-- 推送选项 -->
-          <div class="space-y-3">
-            <label class="text-sm font-medium">推送选项</label>
-            <div class="space-y-2">
-              <label class="flex items-center space-x-2">
-                <input v-model="syncOptions.pushForce" type="checkbox" class="rounded border-border">
-                <span class="text-sm">强制推送 (--force)</span>
-              </label>
-              <label class="flex items-center space-x-2">
-                <input v-model="syncOptions.pushTags" type="checkbox" class="rounded border-border">
-                <span class="text-sm">推送标签 (--tags)</span>
-              </label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          <!-- 同步操作按钮 -->
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <Button
+              @click="fetchRemote"
+              :disabled="isOperating"
+              variant="outline"
+              size="sm"
+              class="flex flex-col items-center py-3 h-auto"
+            >
+              <Loader2 v-if="fetchState.loading" class="w-4 h-4 mb-1 animate-spin" />
+              <RefreshCw v-else class="w-4 h-4 mb-1" />
+              <span class="text-xs">获取</span>
+            </Button>
 
-      <!-- 操作按钮 -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="flex items-center space-x-2">
-            <GitBranch class="w-5 h-5" />
-            <span>同步操作</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button
               @click="pull"
               :disabled="!needsPull || isOperating"
               variant="outline"
-              class="flex flex-col items-center p-4 h-auto"
+              size="sm"
+              class="flex flex-col items-center py-3 h-auto"
             >
-              <Loader2 v-if="pullState.loading" class="w-6 h-6 mb-2 animate-spin" />
-              <Download v-else class="w-6 h-6 mb-2" />
-              <span>拉取</span>
-              <span class="text-xs text-muted-foreground">{{ syncStatus.behind }} 个提交</span>
+              <Loader2 v-if="pullState.loading" class="w-4 h-4 mb-1 animate-spin" />
+              <Download v-else class="w-4 h-4 mb-1" />
+              <span class="text-xs">拉取</span>
+              <span class="text-xs text-muted-foreground">{{ syncStatus.behind }}</span>
             </Button>
 
             <Button
               @click="push"
               :disabled="!needsPush || isOperating"
               variant="outline"
-              class="flex flex-col items-center p-4 h-auto"
+              size="sm"
+              class="flex flex-col items-center py-3 h-auto"
             >
-              <Loader2 v-if="pushState.loading" class="w-6 h-6 mb-2 animate-spin" />
-              <Upload v-else class="w-6 h-6 mb-2" />
-              <span>推送</span>
-              <span class="text-xs text-muted-foreground">{{ syncStatus.ahead }} 个提交</span>
+              <Loader2 v-if="pushState.loading" class="w-4 h-4 mb-1 animate-spin" />
+              <Upload v-else class="w-4 h-4 mb-1" />
+              <span class="text-xs">推送</span>
+              <span class="text-xs text-muted-foreground">{{ syncStatus.ahead }}</span>
             </Button>
 
             <Button
               @click="sync"
               :disabled="(!needsPull && !needsPush) || isOperating"
-              class="flex flex-col items-center p-4 h-auto"
+              size="sm"
+              class="flex flex-col items-center py-3 h-auto"
             >
-              <Loader2 v-if="isOperating" class="w-6 h-6 mb-2 animate-spin" />
-              <RefreshCw v-else class="w-6 h-6 mb-2" />
-              <span>同步</span>
-              <span class="text-xs text-muted-foreground">拉取 + 推送</span>
+              <Loader2 v-if="isOperating" class="w-4 h-4 mb-1 animate-spin" />
+              <RefreshCw v-else class="w-4 h-4 mb-1" />
+              <span class="text-xs">同步</span>
             </Button>
           </div>
 
           <!-- 操作进度 -->
-          <div v-if="currentOperation" class="mt-6">
-            <div class="space-y-2">
-              <div class="flex items-center justify-between text-sm">
-                <span>{{ currentOperation.message }}</span>
-                <span>{{ currentOperation.progress }}%</span>
+          <div v-if="currentOperation" class="space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span>{{ currentOperation.message }}</span>
+              <span>{{ currentOperation.progress }}%</span>
+            </div>
+            <div class="w-full bg-muted rounded-full h-1.5">
+              <div
+                class="bg-primary h-1.5 rounded-full transition-all duration-300"
+                :style="{ width: `${currentOperation.progress}%` }"
+              ></div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- 可折叠的高级选项 -->
+      <Card v-if="showAdvancedOptions" class="shadow-md">
+        <CardHeader class="pb-4">
+          <CardTitle class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg bg-muted">
+                <Settings class="w-5 h-5 text-muted-foreground" />
               </div>
-              <div class="w-full bg-muted rounded-full h-2">
-                <div
-                  class="bg-primary h-2 rounded-full transition-all duration-300"
-                  :style="{ width: `${currentOperation.progress}%` }"
-                ></div>
+              <div>
+                <span class="text-base font-semibold text-foreground">高级选项</span>
+                <p class="text-xs text-muted-foreground mt-0.5">自定义Git同步策略和行为配置</p>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="showAdvancedOptions = false"
+              class="hover:bg-destructive/10 hover:text-destructive transition-colors duration-200"
+            >
+              <X class="w-4 h-4" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-6">
+          <!-- 拉取模式 -->
+          <div class="space-y-4">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg bg-muted">
+                <GitMerge class="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <label class="text-sm font-medium text-foreground">拉取模式</label>
+                <p class="text-xs text-muted-foreground">选择如何将远程更改集成到本地分支</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Merge 选项 -->
+              <Card
+                class="cursor-pointer group transition-all duration-200 hover:shadow-md"
+                :class="syncOptions.pullMode === 'merge' ? 'ring-2 ring-primary ring-offset-2' : ''"
+                @click="syncOptions.pullMode = 'merge'"
+              >
+                <CardContent class="p-4">
+                  <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+                      <GitMerge class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <span class="font-medium text-sm">Merge</span>
+                        <code class="px-1.5 py-0.5 text-xs bg-muted rounded font-mono">--no-ff</code>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed">
+                        创建合并提交，保留分支历史
+                      </p>
+                    </div>
+                    <CheckCircle2 v-if="syncOptions.pullMode === 'merge'" class="w-4 h-4 text-primary flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <!-- Rebase 选项 -->
+              <Card
+                class="cursor-pointer group transition-all duration-200 hover:shadow-md"
+                :class="syncOptions.pullMode === 'rebase' ? 'ring-2 ring-primary ring-offset-2' : ''"
+                @click="syncOptions.pullMode = 'rebase'"
+              >
+                <CardContent class="p-4">
+                  <div class="flex items-start space-x-3">
+                    <div class="p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+                      <GitPullRequest class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <span class="font-medium text-sm">Rebase</span>
+                        <code class="px-1.5 py-0.5 text-xs bg-muted rounded font-mono">--rebase</code>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed">
+                        重写提交历史，保持线性历史
+                      </p>
+                    </div>
+                    <CheckCircle2 v-if="syncOptions.pullMode === 'rebase'" class="w-4 h-4 text-primary flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <!-- 推送选项 -->
+          <div class="space-y-4">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg bg-muted">
+                <Upload class="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <label class="text-sm font-medium text-foreground">推送选项</label>
+                <p class="text-xs text-muted-foreground">控制推送到远程仓库的行为</p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <!-- 强制推送选项 -->
+              <Card class="cursor-pointer group transition-all duration-200 hover:shadow-md" @click="syncOptions.pushForce = !syncOptions.pushForce">
+                <CardContent class="p-4">
+                  <div class="flex items-start space-x-3">
+                    <div class="flex items-center mt-0.5">
+                      <div class="w-4 h-4 rounded border-2 transition-all duration-200 flex items-center justify-center"
+                           :class="syncOptions.pushForce
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground'">
+                        <CheckCircle2 v-if="syncOptions.pushForce" class="w-2.5 h-2.5 text-white" />
+                      </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-muted group-hover:bg-destructive/10 transition-colors">
+                      <Zap class="w-4 h-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <span class="font-medium text-sm">强制推送</span>
+                        <code class="px-1.5 py-0.5 text-xs bg-muted rounded font-mono">--force</code>
+                        <span class="px-1.5 py-0.5 text-xs bg-destructive/10 text-destructive rounded-md font-medium">危险</span>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed">
+                        强制覆盖远程分支，可能导致提交历史丢失
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <!-- 推送标签选项 -->
+              <Card class="cursor-pointer group transition-all duration-200 hover:shadow-md" @click="syncOptions.pushTags = !syncOptions.pushTags">
+                <CardContent class="p-4">
+                  <div class="flex items-start space-x-3">
+                    <div class="flex items-center mt-0.5">
+                      <div class="w-4 h-4 rounded border-2 transition-all duration-200 flex items-center justify-center"
+                           :class="syncOptions.pushTags
+                            ? 'border-primary bg-primary'
+                            : 'border-muted-foreground'">
+                        <CheckCircle2 v-if="syncOptions.pushTags" class="w-2.5 h-2.5 text-white" />
+                      </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+                      <Tag class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <span class="font-medium text-sm">推送标签</span>
+                        <code class="px-1.5 py-0.5 text-xs bg-muted rounded font-mono">--tags</code>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed">
+                        同时推送所有本地标签到远程仓库
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- 高级选项切换按钮 -->
+      <Card v-if="!showAdvancedOptions" class="cursor-pointer group hover:shadow-md transition-all duration-200" @click="showAdvancedOptions = true">
+        <CardContent class="">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors duration-200">
+                <Settings class="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
+              </div>
+              <div>
+                <div class="text-sm font-medium text-foreground group-hover:text-primary transition-colors duration-200">
+                  高级选项
+                </div>
+                <div class="text-xs text-muted-foreground">
+                  自定义Git同步策略和行为配置
+                </div>
+              </div>
+            </div>
+            <ChevronDown class="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-y-0.5 transition-all duration-200" />
           </div>
         </CardContent>
       </Card>
     </div>
 
     <!-- 右侧：操作日志 -->
-    <div class="space-y-6">
-      <Card class="h-full">
-        <CardHeader>
+    <div>
+      <Card class="h-fit">
+        <CardHeader class="pb-3">
           <CardTitle class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <RefreshCw class="w-5 h-5" />
-              <span>操作日志</span>
+              <RefreshCw class="w-4 h-4" />
+              <span class="text-sm">操作日志</span>
             </div>
             <Button
               variant="ghost"
               size="sm"
               @click="operationLogs = []"
+              class="h-6 px-2 text-xs"
             >
               清空
             </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div class="space-y-1 max-h-96 overflow-y-auto">
-            <div v-if="operationLogs.length === 0" class="text-center py-8 text-muted-foreground">
-              <RefreshCw class="w-12 h-12 mx-auto mb-2" />
-              <p>暂无操作日志</p>
+          <div class="space-y-1 max-h-80 overflow-y-auto">
+            <div v-if="operationLogs.length === 0" class="text-center py-6 text-muted-foreground">
+              <RefreshCw class="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p class="text-xs">暂无操作日志</p>
             </div>
 
             <div
               v-for="(log, index) in operationLogs"
               :key="index"
-              class="text-sm font-mono p-2 rounded bg-muted/50 text-muted-foreground"
+              class="text-xs font-mono p-2 rounded bg-muted/30 text-muted-foreground leading-relaxed"
             >
               {{ log }}
             </div>
