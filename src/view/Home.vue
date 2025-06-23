@@ -12,7 +12,7 @@ import { extractRepositoryName } from '@/utils/utils';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from '@/components/ui/toast';
 import {
-  Search,
+  // Search,
   Plus,
   Bell,
   User,
@@ -165,7 +165,7 @@ onMounted(async () => {
             </div>
 
             <!-- 快速搜索 -->
-            <div class="hidden md:flex items-center">
+            <!-- <div class="hidden md:flex items-center">
               <div class="relative">
                 <input
                   type="text"
@@ -174,13 +174,13 @@ onMounted(async () => {
                 >
                 <Search class="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
               </div>
-            </div>
+            </div> -->
           </div>
 
           <!-- 右侧：用户操作区域 -->
           <div class="flex items-center space-x-4">
             <!-- 新建按钮 -->
-            <Button variant="default" size="sm" class="hidden md:flex">
+            <Button variant="default" size="sm" class="hidden md:flex" @click="handleCreateRepo">
               <Plus class="w-4 h-4 mr-2" />
               新建
             </Button>
