@@ -158,11 +158,31 @@ watch(() => props.initialAuthConfig, (newAuthConfig) => {
   }
 }, { immediate: true });
 
+// 监听认证类型变化，自动设置SSH密钥默认值
+watch(() => cloneForm.authType, (newAuthType, oldAuthType) => {
+  // 当切换到SSH认证且没有设置SSH密钥路径时，自动选择第一个可用密钥
+  if (newAuthType === 'ssh' && !cloneForm.sshKeyPath && defaultSshKeys.value.length > 0) {
+    cloneForm.sshKeyPath = defaultSshKeys.value[0];
+    console.log('切换到SSH认证，自动选择默认SSH密钥:', defaultSshKeys.value[0]);
+  }
+  // 当从SSH切换到其他认证方式时，可以选择清空SSH相关字段（可选）
+  else if (oldAuthType === 'ssh' && newAuthType !== 'ssh') {
+    // 这里可以选择是否清空SSH字段，目前保留用户之前的选择
+    console.log('从SSH认证切换到其他认证方式');
+  }
+});
+
 // 生命周期
 onMounted(async () => {
   // 加载默认 SSH 密钥
   try {
     defaultSshKeys.value = await gitApi.getDefaultSshKeys();
+
+    // 如果当前认证类型是SSH且没有设置SSH密钥路径，自动设置第一个可用密钥
+    if (cloneForm.authType === 'ssh' && !cloneForm.sshKeyPath && defaultSshKeys.value.length > 0) {
+      cloneForm.sshKeyPath = defaultSshKeys.value[0];
+      console.log('自动选择默认SSH密钥:', defaultSshKeys.value[0]);
+    }
   } catch (error) {
     console.error('加载默认 SSH 密钥失败:', error);
   }
@@ -213,6 +233,12 @@ const detectAuthType = async () => {
 
     const authType = await gitApi.detectAuthType(cloneForm.url);
     cloneForm.authType = authType as AuthType;
+
+    // 如果检测到SSH认证且没有设置SSH密钥路径，自动选择第一个可用密钥
+    if (authType === 'ssh' && !cloneForm.sshKeyPath && defaultSshKeys.value.length > 0) {
+      cloneForm.sshKeyPath = defaultSshKeys.value[0];
+      console.log('检测到SSH认证，自动选择默认SSH密钥:', defaultSshKeys.value[0]);
+    }
 
     // SSH URL 自动转换提示
     if (authType === 'ssh' && cloneForm.url.startsWith('git@')) {
@@ -620,7 +646,7 @@ const resetForm = () => {
                 <Button
                   v-for="keyPath in defaultSshKeys"
                   :key="keyPath"
-                  variant="ghost"
+                  :variant="cloneForm.sshKeyPath === keyPath ? 'default' : 'ghost'"
                   size="sm"
                   class="text-xs h-6 px-2"
                   @click="cloneForm.sshKeyPath = keyPath"
@@ -645,54 +671,6 @@ const resetForm = () => {
           </div>
         </div>
       </div>
-
-      <!-- 高级选项 -->
-      <!-- <div class="border-t pt-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="showAdvanced = !showAdvanced"
-          class="mb-4"
-        >
-          <svg 
-            class="w-4 h-4 mr-2 transition-transform"
-            :class="{ 'rotate-90': showAdvanced }"
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-          </svg>
-          高级选项
-        </Button>
-
-        <div v-if="showAdvanced" class="space-y-4 pl-6 border-l-2 border-border">
-          <div class="space-y-2">
-            <label class="text-sm font-medium">指定分支</label>
-            <Input v-model="cloneForm.branch" placeholder="留空则使用默认分支" />
-          </div>
-
-          <div class="space-y-2">
-            <label class="text-sm font-medium">克隆深度</label>
-            <Input
-              v-model="cloneForm.depth"
-              type="number"
-              placeholder="留空则克隆完整历史"
-              min="1"
-            />
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <input 
-              id="recursive"
-              v-model="cloneForm.recursive"
-              type="checkbox"
-              class="rounded border-border"
-            />
-            <label for="recursive" class="text-sm font-medium">递归克隆子模块</label>
-          </div>
-        </div>
-      </div> -->
 
       <!-- 克隆进度 -->
       <div v-if="isCloning">
