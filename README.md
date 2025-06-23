@@ -10,6 +10,10 @@
 
 Atomic Heart（原子之心）是一款基于 Tauri 和 Vue 3 开发的现代化 Git 仓库管理桌面应用。它为开发者提供了强大而直观的本地 Git 仓库管理体验，支持多平台 Git 服务集成，包括 GitHub、AtomGit、GitLab、Gitee 等。
 
+![首页](https://res.oafimg.cn/-/030aae52be4b9f5f/1.png)
+![本地仓库](https://res.oafimg.cn/-/75a6699ce23ba47f/2.png)
+![远程仓库](https://res.oafimg.cn/-/8650905c1c0e141c/3.png)
+
 ## 核心功能
 
 ### 🚀 Git 仓库管理
