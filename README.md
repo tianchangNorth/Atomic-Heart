@@ -139,11 +139,12 @@ VITE_APP_CLIENT_SECRET = 'xxxxxxxx'
 ```bash
 # 启动开发服务器
 pnpm run tauri:dev
+```
 
 ### 5. 构建生产版本
 
 ```bash
-# 构建所有平台
+# 构建当前平台
 pnpm run tauri:build
 ```
 
