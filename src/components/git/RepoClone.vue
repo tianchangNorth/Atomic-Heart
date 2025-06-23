@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { open } from '@tauri-apps/plugin-dialog';
+import { homeDir, join } from '@tauri-apps/api/path';
 import { gitApi, gitCloneManager } from '@/services/git-api';
 import { CloneOptionsBuilder, AuthConfigBuilder, formatBytes, formatDuration } from '@/types/git-backend';
 import type { CloneProgress, AuthType, CloneResult, AuthConfig } from '@/types/git-backend';
@@ -57,6 +58,8 @@ const urlError = ref('');
 const directoryError = ref('');
 const currentOperationId = ref<string | null>(null);
 const defaultSshKeys = ref<string[]>([]);
+const defaultCloneDirectory = ref<string>('');
+const suggestedDirectories = ref<string[]>([]);
 
 // 克隆进度状态
 const cloneProgress = ref<CloneProgress | null>(null);
@@ -132,10 +135,73 @@ const formatNetworkSpeed = (bytesPerSecond: number): string => {
   return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
 };
 
+// 从Git URL中提取仓库名称
+const extractRepositoryName = (url: string): string => {
+  try {
+    // 处理不同格式的Git URL
+    let repoName = '';
+
+    if (url.includes('github.com') || url.includes('gitlab.com') || url.includes('atomgit.com') || url.includes('gitee.com')) {
+      // HTTPS URL: https://github.com/user/repo.git
+      // SSH URL: git@github.com:user/repo.git
+      const match = url.match(/[\/:]([^\/]+)\/([^\/]+?)(?:\.git)?(?:\/)?$/);
+      if (match) {
+        repoName = match[2];
+      }
+    } else {
+      // 通用处理：提取最后一个路径段
+      const parts = url.replace(/\.git$/, '').split('/');
+      repoName = parts[parts.length - 1] || 'repository';
+    }
+
+    return repoName || 'repository';
+  } catch (error) {
+    console.error('提取仓库名称失败:', error);
+    return 'repository';
+  }
+};
+
+// 生成默认克隆路径
+const generateDefaultClonePath = async (repoUrl: string): Promise<string> => {
+  try {
+    const repoName = extractRepositoryName(repoUrl);
+    const home = await homeDir();
+
+    // 生成多个可能的路径选项
+    const possiblePaths = [
+      await join(home, 'Projects', repoName),
+      await join(home, 'Code', repoName),
+      await join(home, 'git', repoName),
+      await join(home, 'repositories', repoName),
+      await join(home, 'Desktop', repoName),
+      await join(home, repoName)
+    ];
+
+    // 更新建议路径列表
+    suggestedDirectories.value = possiblePaths;
+
+    // 返回第一个作为默认路径
+    return possiblePaths[0];
+  } catch (error) {
+    console.error('生成默认克隆路径失败:', error);
+    return '';
+  }
+};
+
 // 监听 props 变化
-watch(() => props.initialUrl, (newUrl) => {
+watch(() => props.initialUrl, async (newUrl) => {
   if (newUrl && newUrl !== cloneForm.url) {
     cloneForm.url = newUrl;
+
+    // 如果没有通过props设置初始目录，则生成默认路径
+    if (!props.initialDirectory) {
+      const defaultPath = await generateDefaultClonePath(newUrl);
+      if (defaultPath) {
+        cloneForm.directory = defaultPath;
+        defaultCloneDirectory.value = defaultPath;
+      }
+    }
+
     detectAuthType();
   }
 }, { immediate: true });
@@ -157,6 +223,22 @@ watch(() => props.initialAuthConfig, (newAuthConfig) => {
     cloneForm.sshKeyPassphrase = newAuthConfig.ssh_key_passphrase || '';
   }
 }, { immediate: true });
+
+// 监听URL变化，自动生成默认路径
+watch(() => cloneForm.url, async (newUrl, oldUrl) => {
+  // 只有当URL真正改变且不是通过props设置时才生成默认路径
+  if (newUrl && newUrl !== oldUrl && newUrl !== props.initialUrl) {
+    // 检查URL是否有效
+    if (isValidUrl.value && !cloneForm.directory) {
+      const defaultPath = await generateDefaultClonePath(newUrl);
+      if (defaultPath) {
+        cloneForm.directory = defaultPath;
+        defaultCloneDirectory.value = defaultPath;
+        console.log('自动生成默认克隆路径:', defaultPath);
+      }
+    }
+  }
+});
 
 // 监听认证类型变化，自动设置SSH密钥默认值
 watch(() => cloneForm.authType, (newAuthType, oldAuthType) => {
@@ -185,6 +267,20 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('加载默认 SSH 密钥失败:', error);
+  }
+
+  // 如果有URL但没有目录，生成默认路径
+  if (cloneForm.url && !cloneForm.directory) {
+    try {
+      const defaultPath = await generateDefaultClonePath(cloneForm.url);
+      if (defaultPath) {
+        cloneForm.directory = defaultPath;
+        defaultCloneDirectory.value = defaultPath;
+        console.log('初始化默认克隆路径:', defaultPath);
+      }
+    } catch (error) {
+      console.error('初始化默认路径失败:', error);
+    }
   }
 
   // 自动检测认证类型
@@ -573,6 +669,25 @@ const resetForm = () => {
               浏览
             </Button>
           </div>
+
+          <!-- 显示建议的目录路径 -->
+          <div v-if="suggestedDirectories.length > 0 && !cloneForm.directory" class="space-y-1">
+            <p class="text-xs text-muted-foreground">建议路径:</p>
+            <div class="flex flex-wrap gap-1">
+              <Button
+                v-for="(path, index) in suggestedDirectories.slice(0, 4)"
+                :key="path"
+                variant="ghost"
+                size="sm"
+                class="text-xs h-6 px-2 max-w-[200px] truncate"
+                :title="path"
+                @click="cloneForm.directory = path"
+              >
+                {{ index === 0 ? '📁 ' : '📂 ' }}{{ path.split(/[/\\]/).slice(-2).join('/') }}
+              </Button>
+            </div>
+          </div>
+
           <p v-if="directoryError" class="text-sm" :class="directoryError.startsWith('警告') ? 'text-yellow-600' : 'text-red-600'">
             {{ directoryError }}
           </p>
