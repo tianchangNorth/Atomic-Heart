@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { RepoInfoProps } from '@/types/repository';
 import { useUserStore } from '@/stores';
 
-const props = defineProps<RepoInfoProps>();
+defineProps<RepoInfoProps>();
 const userStore = useUserStore();
 const { user } = userStore;
 
@@ -39,33 +39,6 @@ const formatNumber = (num: number): string => {
     return (num / 1000).toFixed(1) + 'K';
   }
   return num.toString();
-};
-
-// 复制到剪贴板
-const copyToClipboard = async (text: string, type: string) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    console.log(`${type} 已复制到剪贴板:`, text);
-    // 这里可以添加 toast 提示
-  } catch (err) {
-    console.error('复制失败:', err);
-  }
-};
-
-// 处理克隆操作
-const handleClone = (url: string, type: 'https' | 'ssh') => {
-  copyToClipboard(url, type === 'https' ? 'HTTPS 克隆地址' : 'SSH 克隆地址');
-};
-
-// 处理下载操作
-const handleDownload = () => {
-  const downloadUrl = `${props.repository.html_url}/archive/refs/heads/${props.repository.default_branch}.zip`;
-  window.open(downloadUrl, '_blank');
-};
-
-// 处理查看在线操作
-const handleViewOnline = () => {
-  window.open(props.repository.html_url, '_blank');
 };
 </script>
 
@@ -199,7 +172,6 @@ const handleViewOnline = () => {
         <!-- 克隆按钮组 -->
         <div class="space-y-2">
           <Button 
-            @click="handleClone(repository.clone_url, 'https')"
             class="w-full justify-start"
             variant="default"
           >
@@ -210,7 +182,6 @@ const handleViewOnline = () => {
           </Button>
           
           <Button 
-            @click="handleClone(repository.ssh_url, 'ssh')"
             class="w-full justify-start"
             variant="outline"
           >
@@ -224,7 +195,6 @@ const handleViewOnline = () => {
         <!-- 其他操作 -->
         <div class="space-y-2">
           <Button 
-            @click="handleDownload"
             class="w-full justify-start"
             variant="outline"
           >
@@ -235,7 +205,6 @@ const handleViewOnline = () => {
           </Button>
 
           <Button 
-            @click="handleViewOnline"
             class="w-full justify-start"
             variant="outline"
           >

@@ -9,6 +9,7 @@ import { homeDir, join } from '@tauri-apps/api/path';
 import { gitApi, gitCloneManager } from '@/services/git-api';
 import { CloneOptionsBuilder, AuthConfigBuilder, formatBytes, formatDuration } from '@/types/git-backend';
 import type { CloneProgress, AuthType, CloneResult, AuthConfig } from '@/types/git-backend';
+import { useToast } from '@/components/ui/toast';
 import {
   Download,
   Check,
@@ -30,6 +31,8 @@ const props = withDefaults(defineProps<Props>(), {
   initialDirectory: '',
   initialAuthConfig: undefined
 });
+
+const { error: errorToast } = useToast();
 
 // Emits 定义
 const emit = defineEmits<{
@@ -559,7 +562,6 @@ const startClone = async () => {
         }
       },
       (error) => {
-        console.error('克隆失败:', error);
         isCloning.value = false;
         cloneProgress.value = {
           id: currentOperationId.value || 'error',
@@ -573,7 +575,7 @@ const startClone = async () => {
       }
     );
   } catch (error) {
-    console.error('启动克隆失败:', error);
+    errorToast('克隆失败: ' + (error as Error).message);
     isCloning.value = false;
     cloneProgress.value = {
       id: 'error',
