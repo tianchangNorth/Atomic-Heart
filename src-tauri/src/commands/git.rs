@@ -1040,11 +1040,13 @@ pub async fn update_token_last_used(app_handle: AppHandle, domain: String) -> Re
 pub async fn fetch_remote_with_system_git(
     repo_path: String,
     remote_name: Option<String>,
+    ssh_key_path: Option<String>,
 ) -> Result<crate::git::types::SyncResult, String> {
     log::debug!(
-        "使用系统Git执行fetch: {} (remote: {:?})",
+        "使用系统Git执行fetch: {} (remote: {:?}, ssh_key: {:?})",
         repo_path,
-        remote_name
+        remote_name,
+        ssh_key_path
     );
 
     let remote = if let Some(name) = remote_name {
@@ -1061,12 +1063,30 @@ pub async fn fetch_remote_with_system_git(
     };
 
     let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+
+    // 如果指定了SSH密钥，设置GIT_SSH_COMMAND环境变量
+    if let Some(ssh_key) = ssh_key_path {
+        let ssh_command = format!(
+            "ssh -i \"{}\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes",
+            ssh_key
+        );
+        cmd.env("GIT_SSH_COMMAND", ssh_command);
+        log::debug!("使用SSH密钥: {}", ssh_key);
+    } else {
+        // 即使没有指定密钥，也设置超时和批处理模式
+        cmd.env(
+            "GIT_SSH_COMMAND",
+            "ssh -o ConnectTimeout=10 -o BatchMode=yes",
+        );
+    }
+
     cmd.arg("fetch").arg(&remote).current_dir(&repo_path);
 
-    let output = cmd.output().await;
+    // 添加30秒超时
+    let output = tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output()).await;
 
     match output {
-        Ok(output) => {
+        Ok(Ok(output)) => {
             if output.status.success() {
                 // 获取ahead/behind状态
                 let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
@@ -1085,9 +1105,13 @@ pub async fn fetch_remote_with_system_git(
                 Err(format!("Git fetch失败: {}", error_msg))
             }
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             log::error!("执行Git命令失败: {}", e);
             Err(format!("执行Git命令失败: {}", e))
+        }
+        Err(_) => {
+            log::error!("Git fetch操作超时 (30秒)");
+            Err("Git fetch操作超时，可能是SSH密钥认证失败或网络问题".to_string())
         }
     }
 }
@@ -1098,12 +1122,14 @@ pub async fn push_remote_with_system_git(
     repo_path: String,
     remote_name: Option<String>,
     force: Option<bool>,
+    ssh_key_path: Option<String>,
 ) -> Result<crate::git::types::SyncResult, String> {
     log::debug!(
-        "使用系统Git执行push: {} (remote: {:?}, force: {:?})",
+        "使用系统Git执行push: {} (remote: {:?}, force: {:?}, ssh_key: {:?})",
         repo_path,
         remote_name,
-        force
+        force,
+        ssh_key_path
     );
 
     let remote = if let Some(name) = remote_name {
@@ -1124,6 +1150,23 @@ pub async fn push_remote_with_system_git(
     let current_branch = get_current_branch_with_git(&repo_path).await?;
 
     let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+
+    // 如果指定了SSH密钥，设置GIT_SSH_COMMAND环境变量
+    if let Some(ssh_key) = ssh_key_path {
+        let ssh_command = format!(
+            "ssh -i \"{}\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes",
+            ssh_key
+        );
+        cmd.env("GIT_SSH_COMMAND", ssh_command);
+        log::debug!("使用SSH密钥: {}", ssh_key);
+    } else {
+        // 即使没有指定密钥，也设置超时和批处理模式
+        cmd.env(
+            "GIT_SSH_COMMAND",
+            "ssh -o ConnectTimeout=10 -o BatchMode=yes",
+        );
+    }
+
     cmd.arg("push");
 
     if force_flag {
@@ -1134,10 +1177,11 @@ pub async fn push_remote_with_system_git(
         .arg(&current_branch)
         .current_dir(&repo_path);
 
-    let output = cmd.output().await;
+    // 添加30秒超时
+    let output = tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output()).await;
 
     match output {
-        Ok(output) => {
+        Ok(Ok(output)) => {
             if output.status.success() {
                 // 获取ahead/behind状态
                 let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
@@ -1156,9 +1200,13 @@ pub async fn push_remote_with_system_git(
                 Err(format!("Git push失败: {}", error_msg))
             }
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             log::error!("执行Git命令失败: {}", e);
             Err(format!("执行Git命令失败: {}", e))
+        }
+        Err(_) => {
+            log::error!("Git push操作超时 (30秒)");
+            Err("Git push操作超时，可能是SSH密钥认证失败或网络问题".to_string())
         }
     }
 }
@@ -1168,14 +1216,33 @@ pub async fn push_remote_with_system_git(
 pub async fn pull_remote_with_system_git(
     repo_path: String,
     strategy: String,
+    ssh_key_path: Option<String>,
 ) -> Result<crate::git::types::SyncResult, String> {
     log::debug!(
-        "使用系统Git执行pull: {} (strategy: {})",
+        "使用系统Git执行pull: {} (strategy: {}, ssh_key: {:?})",
         repo_path,
-        strategy
+        strategy,
+        ssh_key_path
     );
 
     let mut cmd = crate::utils::system_command::create_hidden_command_async("git");
+
+    // 如果指定了SSH密钥，设置GIT_SSH_COMMAND环境变量
+    if let Some(ssh_key) = ssh_key_path {
+        let ssh_command = format!(
+            "ssh -i \"{}\" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes",
+            ssh_key
+        );
+        cmd.env("GIT_SSH_COMMAND", ssh_command);
+        log::debug!("使用SSH密钥: {}", ssh_key);
+    } else {
+        // 即使没有指定密钥，也设置超时和批处理模式
+        cmd.env(
+            "GIT_SSH_COMMAND",
+            "ssh -o ConnectTimeout=10 -o BatchMode=yes",
+        );
+    }
+
     cmd.arg("pull");
 
     match strategy.as_str() {
@@ -1192,10 +1259,11 @@ pub async fn pull_remote_with_system_git(
 
     cmd.current_dir(&repo_path);
 
-    let output = cmd.output().await;
+    // 添加30秒超时
+    let output = tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output()).await;
 
     match output {
-        Ok(output) => {
+        Ok(Ok(output)) => {
             if output.status.success() {
                 // 获取ahead/behind状态
                 let (ahead, behind) = get_ahead_behind_with_git(&repo_path).await?;
@@ -1230,9 +1298,13 @@ pub async fn pull_remote_with_system_git(
                 }
             }
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             log::error!("执行Git命令失败: {}", e);
             Err(format!("执行Git命令失败: {}", e))
+        }
+        Err(_) => {
+            log::error!("Git pull操作超时 (30秒)");
+            Err("Git pull操作超时，可能是SSH密钥认证失败或网络问题".to_string())
         }
     }
 }

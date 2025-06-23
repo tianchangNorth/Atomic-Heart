@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
 import { gitOperationsApi, type SyncResult, type PullStrategy, type ProtocolType, type TokenConfig } from '@/api/git-operations';
+import { gitApi } from '@/services/git-api';
 import TokenConfigDialog from './TokenConfigDialog.vue';
 import {
   Download,
@@ -79,6 +80,11 @@ const syncOptions = reactive({
 
 // 高级选项展开状态
 const showAdvancedOptions = ref(false);
+
+// SSH密钥管理
+const showSshKeySelector = ref(false);
+const availableSshKeys = ref<string[]>([]);
+const selectedSshKey = ref<string>('');
 
 // 操作状态
 const fetchState = ref({ loading: false, error: null as string | null });
@@ -163,6 +169,21 @@ const detectProtocolAndAuth = async () => {
     } else if (protocol === 'ssh') {
       addLog('SSH协议将使用系统Git命令');
       authStatus.tokenConfigured = true; // SSH不需要token配置
+
+      // 检测可用的SSH密钥
+      try {
+        const sshKeys = await gitApi.getDefaultSshKeys();
+        availableSshKeys.value = sshKeys;
+        if (sshKeys.length > 0) {
+          selectedSshKey.value = sshKeys[0]; // 默认选择第一个
+          addLog(`检测到 ${sshKeys.length} 个SSH密钥，默认使用: ${sshKeys[0].split('/').pop()}`);
+        } else {
+          addLog('未检测到SSH密钥');
+        }
+      } catch (error) {
+        addLog('检测SSH密钥失败');
+        console.error('检测SSH密钥失败:', error);
+      }
     }
 
     authStatus.lastChecked = new Date().toISOString();
@@ -211,8 +232,12 @@ const fetchRemote = async () => {
     currentOperation.value.progress = 30;
     currentOperation.value.message = '获取远程变更...';
 
-    // 使用智能fetch操作
-    const result: SyncResult = await gitOperationsApi.smartFetchRemote(props.repositoryPath);
+    // 使用智能fetch操作，传递SSH密钥
+    const sshKeyPath = authStatus.protocol === 'ssh' ? selectedSshKey.value : undefined;
+    if (sshKeyPath) {
+      addLog(`使用SSH密钥: ${sshKeyPath.split('/').pop()}`);
+    }
+    const result: SyncResult = await gitOperationsApi.smartFetchRemote(props.repositoryPath, undefined, sshKeyPath);
 
     currentOperation.value.progress = 100;
     currentOperation.value.message = '获取完成';
@@ -280,8 +305,12 @@ const pull = async () => {
     currentOperation.value.progress = 60;
     currentOperation.value.message = '拉取远程变更...';
 
-    // 使用智能pull操作
-    const result: SyncResult = await gitOperationsApi.smartPullRemote(props.repositoryPath, syncOptions.pullMode);
+    // 使用智能pull操作，传递SSH密钥
+    const sshKeyPath = authStatus.protocol === 'ssh' ? selectedSshKey.value : undefined;
+    if (sshKeyPath) {
+      addLog(`使用SSH密钥: ${sshKeyPath.split('/').pop()}`);
+    }
+    const result: SyncResult = await gitOperationsApi.smartPullRemote(props.repositoryPath, syncOptions.pullMode, sshKeyPath);
 
     currentOperation.value.progress = 100;
     currentOperation.value.message = '拉取完成';
@@ -353,11 +382,16 @@ const push = async () => {
     currentOperation.value.progress = 60;
     currentOperation.value.message = '推送本地变更...';
 
-    // 使用智能push操作
+    // 使用智能push操作，传递SSH密钥
+    const sshKeyPath = authStatus.protocol === 'ssh' ? selectedSshKey.value : undefined;
+    if (sshKeyPath) {
+      addLog(`使用SSH密钥: ${sshKeyPath.split('/').pop()}`);
+    }
     const result: SyncResult = await gitOperationsApi.smartPushRemote(
       props.repositoryPath,
       syncOptions.remoteName,
-      syncOptions.pushForce
+      syncOptions.pushForce,
+      sshKeyPath
     );
 
     currentOperation.value.progress = 100;
@@ -438,6 +472,13 @@ const configureToken = () => {
   tokenDialog.open = true;
 };
 
+// SSH密钥选择
+const selectSshKey = (keyPath: string) => {
+  selectedSshKey.value = keyPath;
+  showSshKeySelector.value = false;
+  addLog(`切换到SSH密钥: ${keyPath.split('/').pop()}`);
+};
+
 // 初始化时获取远程信息和状态
 onMounted(async () => {
   try {
@@ -515,8 +556,20 @@ onMounted(async () => {
                   配置
                 </Button>
               </div>
-              <div v-else-if="authStatus.protocol === 'ssh'" class="text-xs text-green-600">
-                系统SSH
+              <div v-else-if="authStatus.protocol === 'ssh'" class="flex items-center space-x-2">
+                <span class="text-xs text-green-600">
+                  {{ selectedSshKey ? selectedSshKey.split('/').pop() : 'SSH密钥' }}
+                </span>
+                <Button
+                  v-if="availableSshKeys.length > 1"
+                  variant="ghost"
+                  size="sm"
+                  class="h-5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  @click="showSshKeySelector = true"
+                >
+                  <Key class="w-3 h-3 mr-1" />
+                  选择
+                </Button>
               </div>
             </div>
           </div>
@@ -838,6 +891,42 @@ onMounted(async () => {
         </CardContent>
       </Card>
     </div>
+  </div>
+
+  <!-- SSH密钥选择对话框 -->
+  <div v-if="showSshKeySelector" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click="showSshKeySelector = false">
+    <Card class="w-96 max-w-[90vw]" @click.stop>
+      <CardHeader>
+        <CardTitle class="flex items-center space-x-2">
+          <Key class="w-5 h-5" />
+          <span>选择SSH密钥</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div v-for="keyPath in availableSshKeys" :key="keyPath" class="space-y-2">
+          <Button
+            variant="outline"
+            class="w-full justify-start text-left h-auto p-3"
+            :class="selectedSshKey === keyPath ? 'ring-2 ring-primary' : ''"
+            @click="selectSshKey(keyPath)"
+          >
+            <div class="flex items-center space-x-3">
+              <Key class="w-4 h-4 flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm">{{ keyPath.split('/').pop() }}</div>
+                <div class="text-xs text-muted-foreground truncate">{{ keyPath }}</div>
+              </div>
+              <CheckCircle2 v-if="selectedSshKey === keyPath" class="w-4 h-4 text-primary flex-shrink-0" />
+            </div>
+          </Button>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <Button variant="outline" size="sm" @click="showSshKeySelector = false">
+            取消
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   </div>
 
   <!-- Token配置弹窗 -->

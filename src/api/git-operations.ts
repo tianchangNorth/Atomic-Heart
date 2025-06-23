@@ -522,11 +522,11 @@ export class GitOperationsApi {
   /**
    * 智能fetch操作（自动选择协议）
    */
-  async smartFetchRemote(repoPath: string, remoteName?: string): Promise<SyncResult> {
+  async smartFetchRemote(repoPath: string, remoteName?: string, sshKeyPath?: string): Promise<SyncResult> {
     const protocol = await this.detectRepositoryProtocol(repoPath);
 
     if (protocol === 'ssh') {
-      return this.fetchRemoteWithSystemGit(repoPath, remoteName);
+      return this.fetchRemoteWithSystemGit(repoPath, remoteName, sshKeyPath);
     } else if (protocol === 'https') {
       // 使用支持Token认证的智能fetch
       return this.smartFetchRemoteWithToken(repoPath, remoteName);
@@ -555,11 +555,11 @@ export class GitOperationsApi {
   /**
    * 智能push操作（自动选择协议）
    */
-  async smartPushRemote(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+  async smartPushRemote(repoPath: string, remoteName?: string, force?: boolean, sshKeyPath?: string): Promise<SyncResult> {
     const protocol = await this.detectRepositoryProtocol(repoPath);
 
     if (protocol === 'ssh') {
-      return this.pushRemoteWithSystemGit(repoPath, remoteName, force);
+      return this.pushRemoteWithSystemGit(repoPath, remoteName, force, sshKeyPath);
     } else if (protocol === 'https') {
       // 使用支持Token认证的智能push
       return this.smartPushRemoteWithToken(repoPath, remoteName, force);
@@ -589,11 +589,11 @@ export class GitOperationsApi {
   /**
    * 智能pull操作（自动选择协议）
    */
-  async smartPullRemote(repoPath: string, strategy: PullStrategy): Promise<SyncResult> {
+  async smartPullRemote(repoPath: string, strategy: PullStrategy, sshKeyPath?: string): Promise<SyncResult> {
     const protocol = await this.detectRepositoryProtocol(repoPath);
 
     if (protocol === 'ssh') {
-      return this.pullRemoteWithSystemGit(repoPath, strategy);
+      return this.pullRemoteWithSystemGit(repoPath, strategy, sshKeyPath);
     } else if (protocol === 'https') {
       // 检查并更新token认证
       await this.ensureHttpsAuthentication(repoPath);
@@ -609,11 +609,12 @@ export class GitOperationsApi {
   /**
    * 使用系统Git执行fetch操作
    */
-  async fetchRemoteWithSystemGit(repoPath: string, remoteName?: string): Promise<SyncResult> {
+  async fetchRemoteWithSystemGit(repoPath: string, remoteName?: string, sshKeyPath?: string): Promise<SyncResult> {
     try {
       const result = await invoke<SyncResult>('fetch_remote_with_system_git', {
         repoPath,
-        remoteName
+        remoteName,
+        sshKeyPath
       });
       return result;
     } catch (error) {
@@ -625,12 +626,13 @@ export class GitOperationsApi {
   /**
    * 使用系统Git执行push操作
    */
-  async pushRemoteWithSystemGit(repoPath: string, remoteName?: string, force?: boolean): Promise<SyncResult> {
+  async pushRemoteWithSystemGit(repoPath: string, remoteName?: string, force?: boolean, sshKeyPath?: string): Promise<SyncResult> {
     try {
       const result = await invoke<SyncResult>('push_remote_with_system_git', {
         repoPath,
         remoteName,
-        force
+        force,
+        sshKeyPath
       });
       return result;
     } catch (error) {
@@ -642,11 +644,12 @@ export class GitOperationsApi {
   /**
    * 使用系统Git执行pull操作
    */
-  async pullRemoteWithSystemGit(repoPath: string, strategy: PullStrategy): Promise<SyncResult> {
+  async pullRemoteWithSystemGit(repoPath: string, strategy: PullStrategy, sshKeyPath?: string): Promise<SyncResult> {
     try {
       const result = await invoke<SyncResult>('pull_remote_with_system_git', {
         repoPath,
-        strategy
+        strategy,
+        sshKeyPath
       });
       return result;
     } catch (error) {
