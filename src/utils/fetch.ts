@@ -1,7 +1,10 @@
 // src/utils/http.ts
 import { invoke } from '@tauri-apps/api/core';
 import { getToken } from './token';
-// import router from '@/router';
+import { useToast } from '@/components/ui/toast';
+
+import router from '@/router';
+
 export interface ApiResponse {
   success: boolean;
   code: number;
@@ -17,6 +20,7 @@ interface HttpOptions {
   headers?: Record<string, string>;
 }
 const baseUrl = import.meta.env.VITE_APP_BASE_API;
+const { warning } = useToast();
 /**
  * 统一的请求方法，支持 GET / POST，并自动附带本地 token
  */
@@ -40,7 +44,10 @@ export async function $fetch(url: string, options: HttpOptions): Promise<ApiResp
   if (response.success) {
     return response;
   } else {
-    // router.push('/login');
+    if (response.code === 401) {
+      warning('登录过期，请重新登录');
+      router.push('/login');
+    }
     throw new Error(response.message);
   }
 }
