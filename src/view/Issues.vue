@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { $fetch } from '@/utils/fetch';
-import { invoke } from '@tauri-apps/api/core'
 import { useToast } from '@/components/ui/toast';
 import {
   RefreshCw,
@@ -54,7 +54,8 @@ interface Issue {
   updated_at: string;            // 更新时间
 }
 
-// 状态管理
+// 路由和状态管理
+const router = useRouter();
 const activeTab = ref('assigned'); // 'assigned' | 'created'
 const activeFilter = ref('all'); // 'all' | 'open' | 'closed'
 const searchQuery = ref('');
@@ -192,10 +193,20 @@ const getRepositoryName = (repositoryUrl: string): string => {
   return parts[parts.length - 1] || 'unknown';
 };
 
+const getRepositoryFullName = (repositoryUrl: string): { repo: string, owner: string } => {
+  const parts = repositoryUrl.split('/');
+  const lastTwo = parts.slice(-2); // 获取最后两个部分
+  return {
+    repo: lastTwo[1] || 'unknown',
+    owner: lastTwo[0] || 'unknown'
+  }
+};
+
 // 处理操作
 const handleIssueClick = (issue: Issue) => {
-  // 这里可以添加路由跳转逻辑
-  invoke('open_url', { url: issue.html_url });
+  // 导航到Issue详情页
+  const { owner, repo } = getRepositoryFullName(issue.repository_url);
+  router.push({ name: 'IssueDetail', params: { number: issue.number.toString(), owner, repo } });
 };
 
 const handleCreateIssue = () => {
